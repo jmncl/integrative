@@ -116,6 +116,12 @@ const ProductsList = () => {
 
     const columns = [
         {
+            field: 'id',
+            headerName: 'ID',
+            width: 90,
+            sortingOrder: ['desc', 'asc']
+        },
+        {
             field: 'product',
             headerName: 'Product',
             flex: 1.6,
@@ -128,14 +134,16 @@ const ProductsList = () => {
             headerName: 'Price',
             width: 120,
             align: 'right',
-            headerAlign: 'right'
+            headerAlign: 'right',
+            sortable: false
         },
         {
             field: 'stock',
             headerName: 'Left',
             width: 110,
             align: 'right',
-            headerAlign: 'right'
+            headerAlign: 'right',
+            sortable: false
         },
 
         {
@@ -164,7 +172,7 @@ const ProductsList = () => {
         image: product.images?.[0]?.url || '',
         price: peso(product.price),
         stock: `${product.stock} left`,
-    }));
+    }))
 
     return (
         <>
@@ -188,8 +196,12 @@ const ProductsList = () => {
                                     columns={columns}
 
                                     rowHeight={72}
-                                    pageSize={10}
-                                    rowsPerPageOptions={[5, 10, 25]}
+                                    sortingOrder={['desc', 'asc']}
+                                    pageSizeOptions={[10, 25, 50]}
+                                    initialState={{
+                                        pagination: { paginationModel: { pageSize: 10 } },
+                                        sorting: { sortModel: [{ field: 'id', sort: 'desc' }] }
+                                    }}
                                     checkboxSelection
                                     disableRowSelectionOnClick
                                     rowSelectionModel={selection}

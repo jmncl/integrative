@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react'
+import React, { useEffect } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 
 import MetaData from '../Layout/MetaData'
@@ -83,6 +83,12 @@ const OrdersList = () => {
 
     const columns = [
         {
+            field: 'created',
+            headerName: 'Placed',
+            width: 130,
+            valueFormatter: (value) => value ? new Date(value).toLocaleDateString() : ''
+        },
+        {
             field: 'order',
             headerName: 'Order',
             flex: 1.4,
@@ -95,14 +101,16 @@ const OrdersList = () => {
             headerName: 'Amount',
             width: 120,
             align: 'right',
-            headerAlign: 'right'
+            headerAlign: 'right',
+            sortable: false
         },
         {
             field: 'status',
             headerName: 'Status',
             width: 120,
             align: 'right',
-            headerAlign: 'right'
+            headerAlign: 'right',
+            sortable: false
         },
 
         {
@@ -131,7 +139,8 @@ const OrdersList = () => {
         numofItems: order.orderItems.length,
         amount: peso(order.totalPrice),
         status: order.orderStatus,
-    }));
+        created: new Date(order.createdAt || 0).getTime()
+    }))
 
     return (
         <>
@@ -148,9 +157,13 @@ const OrdersList = () => {
                                     columns={columns}
 
                                     rowHeight={72}
-                                    pageSize={10}
-                                    rowsPerPageOptions={[5, 10, 25]}
-                                    disableSelectionOnClick
+                                    sortingOrder={['desc', 'asc']}
+                                    pageSizeOptions={[10, 25, 50]}
+                                    initialState={{
+                                        pagination: { paginationModel: { pageSize: 10 } },
+                                        sorting: { sortModel: [{ field: 'created', sort: 'desc' }] }
+                                    }}
+                                    disableRowSelectionOnClick
                                     getRowId={(row) => row.id}
                                     showToolbar
                                 />

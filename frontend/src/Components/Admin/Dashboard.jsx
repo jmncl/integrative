@@ -25,16 +25,21 @@ const Dashboard = () => {
                     </div>
                     <section className="panel">
                         <h2>Monthly sales</h2>
+                        <p className="panel-note">Paid orders, oldest month to newest.</p>
                         <MonthlySalesChart range={range} />
                     </section>
-                    <section className="panel">
-                        <h2>Sales by product</h2>
-                        <ProductSalesChart range={range} />
-                    </section>
-                    <section className="panel">
-                        <h2>Sales by customer</h2>
-                        <UserSalesChart range={range} />
-                    </section>
+                    <div className="dash-grid">
+                        <section className="panel">
+                            <h2>Top products</h2>
+                            <p className="panel-note">Highest sales first. The eight leaders in this range.</p>
+                            <ProductSalesChart range={range} />
+                        </section>
+                        <section className="panel">
+                            <h2>Top customers</h2>
+                            <p className="panel-note">Highest spend first. The eight leaders in this range.</p>
+                            <UserSalesChart range={range} />
+                        </section>
+                    </div>
                 </div>
             </div>
         </>

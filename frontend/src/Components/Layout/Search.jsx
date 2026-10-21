@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
+import axios from 'axios'
 import Box from '@mui/material/Box'
 import Slider from '@mui/material/Slider'
 import { peso } from '../../Utils/money'
@@ -12,7 +13,11 @@ const Search = () => {
     const max = Number(params.get('max') || 25000)
     const rating = Number(params.get('rating') || 0)
     const reviews = params.get('reviews') || ''
-    const [keyword, setKeyword] = useState('')
+    const routeKeyword = location.pathname.startsWith('/search/')
+        ? decodeURIComponent(location.pathname.slice('/search/'.length))
+        : ''
+    const [keyword, setKeyword] = useState(routeKeyword)
+    const [suggestions, setSuggestions] = useState([])
     const [open, setOpen] = useState(false)
     const [price, setPrice] = useState([min, max])
     const formRef = useRef(null)
@@ -22,8 +27,43 @@ const Search = () => {
     }, [min, max])
 
     useEffect(() => {
+        setKeyword(routeKeyword)
+    }, [routeKeyword])
+
+    useEffect(() => {
+        const text = keyword.trim()
+        if (text.length < 2) {
+            setSuggestions([])
+            return
+        }
+        const timer = setTimeout(async () => {
+            try {
+                const { data } = await axios.get(`${import.meta.env.VITE_API}/products?keyword=${encodeURIComponent(text)}&page=1`)
+                const names = (data.products || []).map(item => item.name)
+                const words = []
+                names.forEach(name => {
+                    name.split(/\s+/).forEach(word => {
+                        const clean = word.replace(/[^a-z0-9]/gi, '')
+                        if (clean.length > text.length && clean.toLowerCase().startsWith(text.toLowerCase()) && !words.some(item => item.toLowerCase() === clean.toLowerCase())) {
+                            words.push(clean)
+                        }
+                    })
+                })
+                const picks = [...words.slice(0, 4), ...names.filter(name => !words.some(word => name.toLowerCase() === word.toLowerCase())).slice(0, 5)]
+                setSuggestions(picks)
+            } catch (error) {
+                setSuggestions([])
+            }
+        }, 180)
+        return () => clearTimeout(timer)
+    }, [keyword])
+
+    useEffect(() => {
         const close = (event) => {
-            if (formRef.current && !formRef.current.contains(event.target)) setOpen(false)
+            if (formRef.current && !formRef.current.contains(event.target)) {
+                setOpen(false)
+                setSuggestions([])
+            }
         }
         document.addEventListener('mousedown', close)
         return () => document.removeEventListener('mousedown', close)
@@ -40,15 +80,19 @@ const Search = () => {
         navigate(`${path}${query ? `?${query}` : ''}`)
     }
 
+    const goSearch = (value) => {
+        const query = location.search
+        const text = String(value || '').trim()
+        setKeyword(text)
+        setSuggestions([])
+        setOpen(false)
+        if (text) navigate(`/search/${encodeURIComponent(text)}${query}`)
+        else navigate(`/${query}`)
+    }
+
     const searchHandler = (event) => {
         event.preventDefault()
-        const query = location.search
-        if (keyword.trim()) {
-            navigate(`/search/${encodeURIComponent(keyword.trim())}${query}`)
-        } else {
-            navigate(`/${query}`)
-        }
-        setOpen(false)
+        goSearch(keyword)
     }
 
     const filtering = min > 1 || max < 25000 || rating || reviews
@@ -63,6 +107,7 @@ const Search = () => {
                     placeholder="Search products"
                     value={keyword}
                     onChange={(event) => setKeyword(event.target.value)}
+                    autoComplete="off"
                 />
                 <div className="input-group-append">
                     <button
@@ -79,6 +124,15 @@ const Search = () => {
                     </button>
                 </div>
             </div>
+            {suggestions.length > 0 && (
+                <ul className="search-suggest">
+                    {suggestions.map(item => (
+                        <li key={item}>
+                            <button type="button" onClick={() => goSearch(item)}>{item}</button>
+                        </li>
+                    ))}
+                </ul>
+            )}
             {open && (
                 <div className="filter-panel search-filters">
                     <h4>Price</h4>

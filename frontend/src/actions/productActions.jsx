@@ -31,8 +31,9 @@ import {
     REVIEW_OFFER_REQUEST,
     REVIEW_OFFER_SUCCESS,
     REVIEW_OFFER_FAIL,
-
-
+    NEW_REVIEW_REQUEST,
+    NEW_REVIEW_SUCCESS,
+    NEW_REVIEW_FAIL,
     CLEAR_ERRORS
 } from '../constants/productConstants';
 
@@ -55,7 +56,6 @@ export const getProducts = (currentPage = 1, keyword = '', price, category = '',
         if (reviews === 'no') params.set('numOfReviews[lte]', 0)
         const link = `${import.meta.env.VITE_API}/products?${params.toString()}`
         const { data } = await axios.get(link)
-        console.log(data)
         dispatch({
             type: ALL_PRODUCTS_SUCCESS,
             payload: data,

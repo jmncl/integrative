@@ -1,4 +1,5 @@
-import { Link, useNavigate } from 'react-router-dom'
+import { useState } from 'react'
+import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import Search from './Search'
@@ -10,6 +11,9 @@ const Header = () => {
     const { user, isAuthenticated, loading } = useSelector(state => state.auth)
     const { cartItems } = useSelector(state => state.cart)
     const navigate = useNavigate()
+    const location = useLocation()
+    const onLogin = location.pathname === '/login'
+    const [menuOpen, setMenuOpen] = useState(false)
 
     const isAdmin = user?.role === 'admin'
     const loggedIn = Boolean(isAuthenticated && user?.name)
@@ -40,7 +44,7 @@ const Header = () => {
                     </span>
                 </Link>
             </div>
-            {!isAdmin && (
+            {!isAdmin && !onLogin && (
                 <div className="col-12 col-lg-5 mt-3 mt-lg-0">
                     <Search />
                 </div>
@@ -49,33 +53,27 @@ const Header = () => {
                 {user?.name && isAdmin ? (
                     <button className="nav-login" type="button" onClick={logoutHandler}>Logout</button>
                 ) : user?.name ? (
-                    <div className="dropdown d-inline">
-                        <Link to="#!" className="nav-user dropdown-toggle" id="dropDownMenuButton" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+                    <div className="user-menu">
+                        <button type="button" className="nav-user" onClick={() => setMenuOpen(open => !open)}>
                             <figure className="avatar-nav">
-                                <img
-                                    src={user.avatar && user.avatar.url}
-                                    alt={user && user.name}
-                                />
+                                {user.avatar?.url && <img src={user.avatar.url} alt={user.name} />}
                             </figure>
-                            <span>{user && user.name}</span>
-                        </Link>
-                        <div className="dropdown-menu" aria-labelledby="dropDownMenuButton">
-                            <Link className="dropdown-item" to="/offer">Sell or trade</Link>
-                            <Link className="dropdown-item" to="/offers/me">My offers</Link>
-                            <Link className="dropdown-item" to="/orders/me">Orders</Link>
-                            <Link className="dropdown-item" to="/me">Profile</Link>
-                            <button className="dropdown-item text-danger" type="button" onClick={logoutHandler}>
-                                Logout
-                            </button>
-                        </div>
+                            <span>{user.name}</span>
+                        </button>
+                        {menuOpen && (
+                            <div className="dropdown-menu">
+                                <Link className="dropdown-item" to="/offer" onClick={() => setMenuOpen(false)}>Sell or trade</Link>
+                                <Link className="dropdown-item" to="/offers/me" onClick={() => setMenuOpen(false)}>My offers</Link>
+                                <Link className="dropdown-item" to="/orders/me" onClick={() => setMenuOpen(false)}>Orders</Link>
+                                <Link className="dropdown-item" to="/me" onClick={() => setMenuOpen(false)}>Profile</Link>
+                                <button className="dropdown-item text-danger" type="button" onClick={logoutHandler}>Logout</button>
+                            </div>
+                        )}
                     </div>
                 ) : !isAdmin && (
                     <Link to="/login" className="nav-login" id="login_btn">Login</Link>
                 )}
-                {loggedIn && !isAdmin && (
-                    <Link to="/offer" className="nav-login" id="sell_btn">Sell</Link>
-                )}
-                {!isAdmin && (
+                {!isAdmin && !onLogin && (
                     <Link to={loggedIn ? '/cart' : '/login'} className="nav-cart" onClick={openCart}>
                         <span id="cart">Cart</span>
                         <span id="cart_count">{loggedIn && cartItems ? cartItems.length : 0}</span>

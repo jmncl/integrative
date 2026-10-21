@@ -9,6 +9,12 @@ const Filter = require('bad-words');
 const { paidAtMatch } = require('../utils/dateRange');
 const wordFilter = new Filter();
 
+const cleanComment = (comment) => {
+    const value = String(comment || '').trim()
+    if (!value) return ''
+    return wordFilter.clean(value)
+}
+
 const shopVisible = {
     $or: [
         { status: 'approved' },
@@ -108,13 +114,14 @@ exports.newProduct = async (req, res) => {
 exports.getProducts = async (req, res) => {
 
     const resPerPage = 8;
-    const productsCount = await Product.countDocuments(shopVisible);
-
-    // const products = await Product.find()
-    const apiFeatures = new APIFeatures(Product.find(shopVisible), req.query).search().filter()
-    const filteredProductsCount = await apiFeatures.query.clone().countDocuments()
+    const apiFeatures = new APIFeatures(Product.find(shopVisible).select('-reviews'), req.query).search().filter()
+    const filteredCount = apiFeatures.query.clone().countDocuments()
     apiFeatures.pagination(resPerPage);
-    const products = await apiFeatures.query;
+    const [productsCount, filteredProductsCount, products] = await Promise.all([
+        Product.countDocuments(shopVisible),
+        filteredCount,
+        apiFeatures.query
+    ])
 
     if (!products)
         return res.status(400).json({ message: 'error loading products' })
@@ -166,8 +173,8 @@ exports.getSingleProduct = async (req, res, next) => {
             orderStatus: 'Delivered',
             'orderItems.product': product._id
         })
-        canReview = Boolean(bought)
         myReview = product.reviews.find(item => String(item.user) === String(viewer._id)) || null
+        canReview = Boolean(bought) || Boolean(myReview)
     }
     return res.status(200).json({
         success: true,
@@ -183,7 +190,7 @@ exports.getAdminProducts = async (req, res, next) => {
         $nor: [
             { listingType: { $in: ['sale', 'trade'] }, status: { $in: ['pending', 'rejected'] } }
         ]
-    })
+    }).select('-reviews').sort({ createdAt: -1, _id: -1 })
     if (!products) {
         return res.status(404).json({
             success: false,
@@ -280,7 +287,7 @@ exports.createProductReview = async (req, res) => {
             return res.status(403).json({ success: false, message: 'Admins do not review as customers' })
         }
         const rating = Number(req.body.rating)
-        const comment = String(req.body.comment || '').trim()
+        const comment = cleanComment(req.body.comment)
         const productId = Number(req.body.productId)
         if (!comment || !Number.isInteger(rating) || rating < 1 || rating > 5) {
             return res.status(400).json({ success: false, message: 'Choose 1 to 5 stars and write a review' })
@@ -294,14 +301,15 @@ exports.createProductReview = async (req, res) => {
             orderStatus: 'Delivered',
             'orderItems.product': productId
         })
-        if (!bought) {
+        const existing = product.reviews.find(item => String(item.user) === String(req.user._id))
+        if (!bought && !existing) {
             return res.status(403).json({ success: false, message: 'You can review this after the order is delivered' })
         }
-        const existing = product.reviews.find(item => String(item.user) === String(req.user._id))
         if (existing) {
             existing.comment = comment
             existing.rating = rating
             existing.name = req.user.name
+            product.markModified('reviews')
         } else {
             product.reviews.push({
                 _id: await nextNumber('review'),
@@ -350,7 +358,7 @@ exports.getAdminReviews = async (req, res) => {
             productCode: product.code || `JB${product._id}`,
             productImage: product.images?.[0]?.url || ''
         }
-    }))
+    })).sort((a, b) => Number(b._id) - Number(a._id))
     res.status(200).json({ success: true, reviews })
 }
 
@@ -379,62 +387,31 @@ exports.deleteReview = async (req, res, next) => {
     })
 }
 
-exports.productSales = async (req, res, next) => {
-    // SELECT product.name,sum(price * quantity) as total
-    // FROM order
-    // GROUP BY product_id
-    const totalSales = await Order.aggregate([
-        {
-            $group: {
-                _id: null,
-                total: { $sum: "$itemsPrice" }
-
-            },
-
-        },
-    ])
-    // console.log(totalSales)
+exports.productSales = async (req, res) => {
+    const match = paidAtMatch(req.query)
     const sales = await Order.aggregate([
-        { $project: { _id: 0, "orderItems": 1, totalPrice: true } },
-        { $unwind: "$orderItems" },
-
+        ...(match ? [match] : []),
+        { $unwind: '$orderItems' },
         {
             $group: {
-                _id: { product: "$orderItems.name" },
-                total: { $sum: { $multiply: ["$orderItems.price", "$orderItems.quantity"] } }
-            },
+                _id: '$orderItems.name',
+                total: { $sum: { $multiply: ['$orderItems.price', '$orderItems.quantity'] } }
+            }
         },
+        { $sort: { total: -1 } }
     ])
-    console.log(sales)
-
-    if (!totalSales.length || !totalSales[0].total) {
-        return res.status(200).json({
-            success: true,
-            totalPercentage: [],
-            sales: sales || [],
-            totalSales
-        })
-    }
-
-    let totalPercentage = {}
-    totalPercentage = sales.map(item => {
-
-        // console.log( ((item.total/totalSales[0].total) * 100).toFixed(2))
-        percent = Number(((item.total / totalSales[0].total) * 100).toFixed(2))
-        total = {
-            name: item._id.product,
-            percent
-        }
-        return total
-    })
-    console.log(totalPercentage)
+    const grand = sales.reduce((sum, item) => sum + item.total, 0)
+    const totalPercentage = sales.map(item => ({
+        name: item._id,
+        total: item.total,
+        percent: grand ? Number(((item.total / grand) * 100).toFixed(1)) : 0
+    }))
     res.status(200).json({
         success: true,
         totalPercentage,
-        sales,
-        totalSales
+        sales: totalPercentage,
+        totalSales: grand
     })
-
 }
 
 const offerConditions = ['New', 'Good', 'Fair']
@@ -539,7 +516,7 @@ exports.getPendingOffers = async (req, res) => {
         const offers = await Product.find({
             status: 'pending',
             listingType: { $in: ['sale', 'trade'] }
-        }).populate('offeredBy', 'name email').sort({ createdAt: -1 })
+        }).populate('offeredBy', 'name email').sort({ createdAt: -1, _id: -1 })
         return res.status(200).json({
             success: true,
             offers

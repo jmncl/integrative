@@ -7,15 +7,12 @@ const Product = ({ product }) => {
             <div className="card p-0">
                 <img
                     className="card-img-top mx-auto"
-                    src={product.images[0] ? product.images[0].url : null}
+                    src={product.images?.[0]?.url || ''}
                     alt={product.name}
                 />
                 <div className="card-body d-flex flex-column">
-                    <p className="card-category">
-                        {product.category}
-                        {product.listingType === 'sale' ? ' · For sale' : ''}
-                        {product.listingType === 'trade' ? ' · For trade' : ''}
-                    </p>
+                    {product.listingType === 'sale' && <p className="card-category">For sale</p>}
+                    {product.listingType === 'trade' && <p className="card-category">For trade</p>}
                     <h5 className="card-title">
                         <Link to={`/product/${product._id}`}>{product.name}</Link>
                     </h5>

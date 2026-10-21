@@ -121,9 +121,9 @@ const ListOrders = () => {
                         rows={rows}
                         columns={columns}
 
-                        pageSize={5}
-                        rowsPerPageOptions={[5, 10, 25]}
-                        disableSelectionOnClick
+                        pageSizeOptions={[5, 10, 25]}
+                        initialState={{ pagination: { paginationModel: { pageSize: 5 } } }}
+                        disableRowSelectionOnClick
                         getRowId={(row) => row.id}
                         showToolbar
                     />

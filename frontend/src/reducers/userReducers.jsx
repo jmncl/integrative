@@ -43,9 +43,13 @@ import {
 
 export const authReducer = (state = { user: {} }, action) => {
     switch (action.type) {
+        case LOAD_USER_REQUEST:
+            return {
+                ...state,
+                loading: true
+            }
         case REGISTER_USER_REQUEST:
         case LOGIN_REQUEST:
-        case LOAD_USER_REQUEST:
             return {
                 ...state,
                 loading: true,

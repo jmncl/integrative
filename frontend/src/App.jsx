@@ -10,7 +10,6 @@ import { loadUserCart } from './actions/cartActions'
 
 import Header from './Components/Layout/Header'
 import Footer from './Components/Layout/Footer'
-import Blank from './Components/Layout/Blank'
 import Home from './Components/Home'
 import ProductDetails from './Components/Product/ProductDetails'
 import Register from './Components/User/Register'
@@ -39,6 +38,7 @@ import OfferQueue from './Components/Admin/OfferQueue';
 import ProductReviews from './Components/Admin/ProductReviews';
 import NewOffer from './Components/Offer/NewOffer';
 import MyOffers from './Components/Offer/MyOffers';
+import ForgotPassword from './Components/User/ForgotPassword';
 function App() {
   const dispatch = useDispatch()
   const { user, isAuthenticated } = useSelector(state => state.auth)
@@ -53,102 +53,23 @@ function App() {
     }
   }, [dispatch, isAuthenticated, user?._id])
 
-  // const [state, setState] = useState({
-  //   cartItems: localStorage.getItem('cartItems')
-  //     ? JSON.parse(localStorage.getItem('cartItems'))
-  //     : [],
-
-  //   shippingInfo: localStorage.getItem('shippingInfo')
-  //     ? JSON.parse(localStorage.getItem('shippingInfo'))
-  //     : {},
-  // })
-
-  // const addItemToCart = async (id, quantity) => {
-  //   // console.log(id, quantity)
-  //   try {
-  //     const { data } = await axios.get(`${import.meta.env.VITE_API}/product/${id}`)
-  //     const item = {
-  //       product: data.product._id,
-  //       name: data.product.name,
-  //       price: data.product.price,
-  //       image: data.product.images[0].url,
-  //       stock: data.product.stock,
-  //       quantity: quantity
-  //     }
-
-  //     const isItemExist = state.cartItems.find(i => i.product === item.product)
-
-  //     // setState({
-  //     //   ...state,
-  //     //   cartItems: [...state.cartItems, item]
-  //     // })
-  //     if (isItemExist) {
-  //       setState({
-  //         ...state,
-  //         cartItems: state.cartItems.map(i => i.product === isItemExist.product ? item : i)
-  //       })
-  //     }
-  //     else {
-  //       setState({
-  //         ...state,
-  //         cartItems: [...state.cartItems, item]
-  //       })
-  //     }
-
-  //     toast.success('Item Added to Cart', {
-  //       position: 'bottom-right'
-  //     })
-
-
-  //   } catch (error) {
-  //     toast.error(error, {
-  //       position: 'top-left'
-  //     });
-
-  //   }
-
-  // }
-  // localStorage.setItem('cartItems', JSON.stringify(state.cartItems))
-  // const removeItemFromCart = async (id) => {
-  //   setState({
-  //     ...state,
-  //     cartItems: state.cartItems.filter(i => i.product !== id)
-  //   })
-  //   localStorage.setItem('cartItems', JSON.stringify(state.cartItems))
-  // }
-
-  // const saveShippingInfo = async (data) => {
-  //   setState({
-  //     ...state,
-  //     shippingInfo: data
-  //   })
-  //   localStorage.setItem('shippingInfo', JSON.stringify(data))
-  // }
   return (
     <div className="site">
       <Router>
         <Header />
         <main className="site-main">
         <Routes>
-          <Route path="/" element={<CustomerRoute><Home /></CustomerRoute>} exact="true" />
-          {/* <Route path="/product/:id" element={<ProductDetails cartItems={state.cartItems} addItemToCart={addItemToCart} />} exact="true" /> */}
-          <Route path="/product/:id" element={<CustomerRoute><ProductDetails /></CustomerRoute>} exact="true" />
+          <Route path="/" element={<CustomerRoute><Home /></CustomerRoute>} />
+          <Route path="/product/:id" element={<CustomerRoute><ProductDetails /></CustomerRoute>} />
           <Route path="/search/:keyword" element={<CustomerRoute><Home /></CustomerRoute>} exact="true" />
           <Route path="/login" element={<Login />} exact="true" />
           <Route path="/register" element={<CustomerRoute><Register /></CustomerRoute>} />
-          <Route path="/password/forgot" element={<Blank />} exact="true" />
-          <Route path="/password/reset/:token" element={<Blank />} exact="true" />
-          <Route path="/blank" element={<Blank />} />
+          <Route path="/password/forgot" element={<ForgotPassword />} />
+          <Route path="/password/reset/:token" element={<ForgotPassword />} />
           <Route path="/me" element={<CustomerRoute><Profile /></CustomerRoute>} exact="true" />
           <Route path="/me/update" element={<CustomerRoute><UpdateProfile /></CustomerRoute>} exact="true" />
           <Route path="/password/update" element={<CustomerRoute><UpdatePassword /></CustomerRoute>} />
-          {/* <Route path="/cart" element={<Cart cartItems={state.cartItems} addItemToCart={addItemToCart} removeItemFromCart={removeItemFromCart} />} exact="true" /> */}
-          <Route path="/cart" element={<CustomerRoute><Cart /></CustomerRoute>} exact="true" />
-          {/* <Route path="/shipping" element={<Shipping shipping={state.shippingInfo} saveShippingInfo={saveShippingInfo} />} />
-          <Route path="/confirm" element={<ConfirmOrder cartItems={state.cartItems} shippingInfo={state.shippingInfo} />} />
-          <Route path="/payment" element={<Payment cartItems={state.cartItems} shippingInfo={state.shippingInfo} />} /> */}
-
-
+          <Route path="/cart" element={<CustomerRoute><Cart /></CustomerRoute>} />
           <Route path="/shipping" element={<CustomerRoute><Shipping /></CustomerRoute>} />
           <Route path="/confirm" element={<CustomerRoute><ConfirmOrder /></CustomerRoute>} />
           <Route path="/payment" element={<CustomerRoute><Payment /></CustomerRoute>} />
@@ -157,22 +78,9 @@ function App() {
           <Route path="/offer" element={<ProtectedRoute><CustomerRoute><NewOffer /></CustomerRoute></ProtectedRoute>} />
           <Route path="/offers/me" element={<ProtectedRoute><CustomerRoute><MyOffers /></CustomerRoute></ProtectedRoute>} />
           <Route path="/order/:id" element={<CustomerRoute><OrderDetails /></CustomerRoute>} />
-          {/* <Route path="/dashboard" element={<Dashboard />} /> */}
-
-          {/* <Route path="/admin/products" element={<ProductsList />} /> */}
-          {/* <Route path="/admin/product" element={<NewProduct />} /> */}
-          {/* <Route
-            path="/admin/orders"
-            element={<OrdersList />}
-
-          /> */}
-          <Route
-            path="/admin/order/:id"
-            element={<ProcessOrder />} />
-          <Route
-            path="/admin/users"
-            element={<UsersList />} />
-          <Route path="/admin/user/:id" element={<UpdateUser />} />
+          <Route path="/admin/order/:id" element={<ProtectedRoute isAdmin={true}><ProcessOrder /></ProtectedRoute>} />
+          <Route path="/admin/users" element={<ProtectedRoute isAdmin={true}><UsersList /></ProtectedRoute>} />
+          <Route path="/admin/user/:id" element={<ProtectedRoute isAdmin={true}><UpdateUser /></ProtectedRoute>} />
 
           <Route
             path="/admin/products"

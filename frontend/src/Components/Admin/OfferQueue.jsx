@@ -58,7 +58,7 @@ const OfferQueue = () => {
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    {offers.map(offer => {
+                                    {[...offers].sort((a, b) => Number(b._id) - Number(a._id)).map(offer => {
                                         const person = offer.offeredBy && typeof offer.offeredBy === 'object' ? offer.offeredBy : null
                                         return (
                                             <tr key={offer._id}>

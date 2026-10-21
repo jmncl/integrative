@@ -59,7 +59,13 @@ const ProductReviews = () => {
 
     const columns = [
         {
+            field: 'id',
+            headerName: 'ID',
+            width: 90
+        },
+        {
             field: 'productName',
+            sortable: false,
             headerName: 'Product',
             flex: 1.3,
             minWidth: 260,
@@ -70,10 +76,11 @@ const ProductReviews = () => {
             headerName: 'User',
             flex: 1,
             minWidth: 180,
+            sortable: false,
             renderCell: (params) => <TableFace image={params.row.avatar} title={params.row.name} />
         },
-        { field: 'rating', headerName: 'Rating', width: 110 },
-        { field: 'comment', headerName: 'Comment', flex: 1.4, minWidth: 220 },
+        { field: 'rating', headerName: 'Rating', width: 110, sortable: false },
+        { field: 'comment', headerName: 'Comment', flex: 1.4, minWidth: 220, sortable: false },
         {
             field: 'actions',
             headerName: 'Actions',
@@ -124,7 +131,11 @@ const ProductReviews = () => {
                                 autoHeight
                                 rowHeight={72}
                                 pageSizeOptions={[10, 25, 50]}
-                                initialState={{ pagination: { paginationModel: { pageSize: 10 } } }}
+                                sortingOrder={['desc', 'asc']}
+                                initialState={{
+                                    pagination: { paginationModel: { pageSize: 10 } },
+                                    sorting: { sortModel: [{ field: 'id', sort: 'desc' }] }
+                                }}
                                 disableRowSelectionOnClick
                                 getRowId={(row) => row.id}
                             />

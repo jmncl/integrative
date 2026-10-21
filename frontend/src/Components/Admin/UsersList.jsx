@@ -56,6 +56,12 @@ const UsersList = () => {
 
     const columns = [
         {
+            field: 'id',
+            headerName: 'UID',
+            width: 110,
+            renderCell: (params) => `UID${params.value}`
+        },
+        {
             field: 'name',
             headerName: 'Name',
             flex: 1,
@@ -101,7 +107,7 @@ const UsersList = () => {
         avatar: user.avatar?.url || '',
         email: user.email,
         role: user.role,
-    }));
+    })).sort((a, b) => Number(a.id) - Number(b.id))
 
     return (
         <>
@@ -118,9 +124,13 @@ const UsersList = () => {
                                     columns={columns}
 
                                     rowHeight={72}
-                                    pageSize={10}
-                                    rowsPerPageOptions={[5, 10, 25]}
-                                    disableSelectionOnClick
+                                    sortingOrder={['asc', 'desc']}
+                                    pageSizeOptions={[10, 25, 50]}
+                                    initialState={{
+                                        pagination: { paginationModel: { pageSize: 10 } },
+                                        sorting: { sortModel: [{ field: 'id', sort: 'asc' }] }
+                                    }}
+                                    disableRowSelectionOnClick
                                     getRowId={(row) => row.id}
                                     showToolbar
                                 />

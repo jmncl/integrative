@@ -72,7 +72,7 @@ exports.getSingleOrder = async (req, res, next) => {
 }
 
 exports.allOrders = async (req, res, next) => {
-    const orders = await Order.find()
+    const orders = await Order.find().sort({ createdAt: -1, _id: -1 })
     // console.log(orders)
     let totalAmount = 0;
 
@@ -299,11 +299,13 @@ exports.salesPerMonth = async (req, res, next) => {
                 }
             }
         },
-        { $sort: { "_id.month": 1 } },
+        { $sort: { '_id.year': 1, '_id.month': 1 } },
         {
             $project: {
                 _id: false,
-                month: true,
+                month: {
+                    $concat: ['$month', ' ', { $toString: '$_id.year' }]
+                },
                 total: true,
             }
         }

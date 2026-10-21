@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom'
 import { useNavigate, useParams } from 'react-router-dom'
 import { toast } from 'react-toastify'
 import MetaData from '../Layout/MetaData'
+import Loader from '../Layout/Loader'
 import { useDispatch, useSelector } from 'react-redux'
 import { getProductDetails, newReview } from '../../actions/productActions'
 import { NEW_REVIEW_RESET, CLEAR_ERRORS } from '../../constants/productConstants'
@@ -11,7 +12,7 @@ import { peso } from '../../Utils/money'
 import { productCode } from '../../Utils/codes'
 
 const ProductDetails = () => {
-    const { product, canReview, myReview } = useSelector(state => state.productDetails);
+    const { product, canReview, myReview, loading: productLoading, error: productError } = useSelector(state => state.productDetails);
     const { success: reviewDone, error: reviewError } = useSelector(state => state.newReview)
     const { user, isAuthenticated, loading } = useSelector(state => state.auth)
     const [quantity, setQuantity] = useState(1)
@@ -22,6 +23,8 @@ const ProductDetails = () => {
     const [sheet, setSheet] = useState(false)
     const [reviewRating, setReviewRating] = useState(5)
     const [reviewComment, setReviewComment] = useState('')
+    const [moreReviews, setMoreReviews] = useState(false)
+    const [starFilter, setStarFilter] = useState(5)
     const { id } = useParams()
     const dispatch = useDispatch()
     const navigate = useNavigate()
@@ -90,6 +93,8 @@ const ProductDetails = () => {
         setPhoto(0)
         setAdded(false)
         setSheet(false)
+        setMoreReviews(false)
+        setStarFilter(5)
     }, [dispatch, id]);
 
     useEffect(() => {
@@ -114,6 +119,8 @@ const ProductDetails = () => {
         }
     }, [reviewDone, reviewError, dispatch, id, myReview])
 
+    const ready = product && String(product._id) === String(id)
+
     const submitReview = (event) => {
         event.preventDefault()
         if (!loggedIn) {
@@ -122,6 +129,15 @@ const ProductDetails = () => {
             return
         }
         dispatch(newReview({ rating: Number(reviewRating), comment: reviewComment, productId: product._id }))
+    }
+
+    if (!ready) {
+        return (
+            <>
+                <MetaData title={'Product'} />
+                {productError && !productLoading ? <p className="empty-note">{productError}</p> : <Loader />}
+            </>
+        )
     }
 
     return (
@@ -160,8 +176,6 @@ const ProductDetails = () => {
                     {forSale && <p className="card-category">For sale</p>}
                     {product.category && <p className="card-category">{product.category}</p>}
                     {product.condition && <p className="photo-note">Condition: {product.condition}</p>}
-                    {status === 'pending' && <p className="status-pill status-pending">Pending</p>}
-                    {status === 'rejected' && <p className="status-pill status-rejected">Rejected</p>}
                     {forTrade && status === 'approved' && (
                         <div className="trade-panel">
                             <p className="eyebrow">For trade</p>
@@ -177,10 +191,8 @@ const ProductDetails = () => {
                         </>
                     )}
                     <hr />
-                    <p>Status: <span id="stock_status" className={product.stock > 0 ? 'greenColor' : 'redColor'}>{product.stock > 0 ? `${product.stock} left` : 'Out of Stock'}</span></p>
                     <h4 className="mt-4">Description</h4>
                     <p>{product.description}</p>
-                    <p id="product_seller" className="mt-3">Sold by <strong>{product.seller}</strong></p>
                 </div>
             </div>
             {product._id && (
@@ -200,15 +212,42 @@ const ProductDetails = () => {
                     ) : (
                         <p className="photo-note">{loggedIn ? 'You can review this after a delivered order.' : 'Log in to review a product you already received.'}</p>
                     )}
-                    {(product.reviews || []).length === 0 ? (
-                        <p className="empty-note">No reviews yet.</p>
-                    ) : product.reviews.map(review => (
-                        <article key={review._id} className="review-card">
-                            <p className="card-stars">{'★'.repeat(review.rating)}{'☆'.repeat(5 - review.rating)}</p>
-                            <p className="review_user">{review.name}</p>
-                            <p>{review.comment}</p>
-                        </article>
-                    ))}
+                    {(() => {
+                        const allReviews = [...(product.reviews || [])]
+                        const preview = allReviews.filter(review => review.rating === 5).slice(0, 3)
+                        const shown = moreReviews ? allReviews.filter(review => review.rating === starFilter) : preview
+                        if (!allReviews.length) return <p className="empty-note">No reviews yet.</p>
+                        const cards = (list) => list.map(review => (
+                            <article key={review._id} className="review-card">
+                                <p className="card-stars">{'★'.repeat(review.rating)}{'☆'.repeat(5 - review.rating)}</p>
+                                <p className="review_user">{review.name}</p>
+                                <p>{review.comment}</p>
+                            </article>
+                        ))
+                        return (
+                            <>
+                                {!moreReviews && (preview.length ? cards(preview) : <p className="empty-note">No 5-star reviews yet.</p>)}
+                                {!moreReviews && allReviews.length > preview.length && (
+                                    <button type="button" className="btn review-more" onClick={() => setMoreReviews(true)}>View more reviews</button>
+                                )}
+                                {moreReviews && (
+                                    <div className="filter-choices review-stars">
+                                        {[5, 4, 3, 2, 1].map(stars => (
+                                            <button
+                                                key={stars}
+                                                type="button"
+                                                className={starFilter === stars ? 'active' : ''}
+                                                onClick={() => setStarFilter(stars)}
+                                            >
+                                                {stars} star{stars > 1 ? 's' : ''}
+                                            </button>
+                                        ))}
+                                    </div>
+                                )}
+                                {moreReviews && (shown.length ? cards(shown) : <p className="empty-note">No {starFilter}-star reviews.</p>)}
+                            </>
+                        )
+                    })()}
                 </section>
             )}
             {sheet && canBuy && createPortal(

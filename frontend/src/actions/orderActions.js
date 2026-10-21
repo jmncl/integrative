@@ -45,7 +45,7 @@ export const createOrder = (order) => async (dispatch) => {
     } catch (error) {
         dispatch({
             type: CREATE_ORDER_FAIL,
-            payload: error.response.data.message
+            payload: error.response?.data?.message || 'Request failed'
         })
     }
 
@@ -62,7 +62,7 @@ export const myOrders = () => async (dispatch) => {
     } catch (error) {
         dispatch({
             type: MY_ORDERS_FAIL,
-            payload: error.response.data.message
+            payload: error.response?.data?.message || 'Request failed'
         })
     }
 }
@@ -78,7 +78,7 @@ export const getOrderDetails = (id) => async (dispatch) => {
     } catch (error) {
         dispatch({
             type: ORDER_DETAILS_FAIL,
-            payload: error.response.data.message
+            payload: error.response?.data?.message || 'Request failed'
         })
     }
 }
@@ -98,13 +98,12 @@ export const allOrders = () => async (dispatch) => {
     } catch (error) {
         dispatch({
             type: ALL_ORDERS_FAIL,
-            payload: error.response.data.message
+            payload: error.response?.data?.message || 'Request failed'
         })
     }
 }
 
 export const updateOrder = (id, orderData) => async (dispatch) => {
-    console.log(orderData)
     try {
         dispatch({ type: UPDATE_ORDER_REQUEST })
         const config = {
@@ -121,7 +120,7 @@ export const updateOrder = (id, orderData) => async (dispatch) => {
     } catch (error) {
         dispatch({
             type: UPDATE_ORDER_FAIL,
-            payload: error.response.data.message
+            payload: error.response?.data?.message || 'Could not update the order'
         })
 
     }
@@ -138,7 +137,7 @@ export const deleteOrder = (id) => async (dispatch) => {
     } catch (error) {
         dispatch({
             type: DELETE_ORDER_FAIL,
-            payload: error.response.data.message
+            payload: error.response?.data?.message || 'Request failed'
         })
     }
 }

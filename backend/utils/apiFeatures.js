@@ -14,7 +14,6 @@ class APIFeatures {
                 $options: 'i'
             }
         } : {}
-        console.log(this.query, this.queryStr);
         this.query = this.query.find({ ...keyword });
         return this;
     }
@@ -60,7 +59,6 @@ class APIFeatures {
         const numOfReviews = pullRange('numOfReviews');
         if (numOfReviews) clauses.push({ numOfReviews });
 
-        console.log(queryCopy);
         if (Object.keys(queryCopy).length) {
             clauses.push(queryCopy);
         }
