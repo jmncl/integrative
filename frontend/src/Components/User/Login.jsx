@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { Link, useNavigate, useLocation } from 'react-router-dom'
 import { useForm } from 'react-hook-form'
 import { yupResolver } from '@hookform/resolvers/yup'
@@ -16,16 +16,31 @@ const loginSchema = yup.object({
 })
 
 const Login = () => {
-    const { isAuthenticated, error, loading, user } = useSelector(state => state.auth)
+    const { isAuthenticated, error, user } = useSelector(state => state.auth)
     const { register, handleSubmit, formState: { errors } } = useForm({
         resolver: yupResolver(loginSchema)
     })
+    const [busy, setBusy] = useState(false)
     const navigate = useNavigate()
     const location = useLocation()
     const dispatch = useDispatch()
 
-    const submitHandler = (values) => {
-        dispatch(login(values.email, values.password))
+    const submitHandler = async (values) => {
+        setBusy(true)
+        try {
+            await dispatch(login(values.email, values.password))
+        } finally {
+            setBusy(false)
+        }
+    }
+
+    const googleLogin = async () => {
+        setBusy(true)
+        try {
+            await dispatch(loginWithGoogle())
+        } finally {
+            setBusy(false)
+        }
     }
 
     const redirect = location.search ? new URLSearchParams(location.search).get('redirect') : ''
@@ -67,15 +82,14 @@ const Login = () => {
                             {errors.password && <p className="text-danger mt-2 mb-0">{errors.password.message}</p>}
                         </div>
 
-                        <button id="login_button" type="submit" className="btn btn-block py-3" disabled={loading}>
-                            {loading ? 'Logging in...' : 'Login'}
+                        <button id="login_button" type="submit" className="btn btn-block py-3" disabled={busy}>
+                            {busy ? 'Logging in...' : 'Login'}
                         </button>
-                        <button type="button" className="btn btn-block py-3 mt-3" onClick={() => dispatch(loginWithGoogle())} disabled={loading}>
+                        <button type="button" className="btn btn-block py-3 mt-3" onClick={googleLogin} disabled={busy}>
                             Continue with Google
                         </button>
 
                         <div className="form-links">
-                            <Link to="/password/forgot">Forgot password?</Link>
                             <Link to="/register">Create an account</Link>
                         </div>
                     </form>

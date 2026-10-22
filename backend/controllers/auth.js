@@ -57,18 +57,25 @@ exports.firebaseLogin = async (req, res) => {
         if (!lookup.ok || !person || !person.email) {
             return res.status(401).json({ message: 'Google login failed' })
         }
+        const provider = (person.providerUserInfo || []).find(item => item.photoUrl || item.displayName) || {}
+        const sentPhoto = String(req.body.photoURL || '')
+        const photo = [person.photoUrl, provider.photoUrl, sentPhoto].find(url => String(url || '').startsWith('https://')) || ''
+        const name = String(person.displayName || provider.displayName || 'Google User').slice(0, 30)
         let user = await User.findOne({ email: person.email })
+        const avatar = {
+            public_id: `google-${person.localId}`,
+            url: photo || `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=111111&color=ffffff`
+        }
         if (!user) {
-            const name = String(person.displayName || 'Google User').slice(0, 30)
             user = await User.create({
                 name,
                 email: person.email,
                 password: crypto.randomBytes(18).toString('hex'),
-                avatar: {
-                    public_id: `google-${person.localId}`,
-                    url: person.photoUrl || `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=111111&color=ffffff`
-                }
+                avatar
             })
+        } else if (photo && String(user.avatar?.public_id || '').startsWith('google-') && user.avatar?.url !== photo) {
+            user.avatar = avatar
+            await user.save({ validateBeforeSave: false })
         }
         sendToken(user, 200, res)
     } catch (error) {

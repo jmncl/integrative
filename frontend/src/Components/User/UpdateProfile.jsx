@@ -158,7 +158,7 @@ const UpdateProfile = () => {
                             <div className='d-flex align-items-center'>
                                 <figure className='avatar mr-3'>
                                     {avatarPreview ? (
-                                        <img src={avatarPreview} className='rounded-circle' alt='Avatar Preview' />
+                                        <img src={avatarPreview} className='rounded-circle' alt='Avatar Preview' referrerPolicy="no-referrer" />
                                     ) : (
                                         <span className="avatar-fallback">J</span>
                                     )}

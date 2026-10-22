@@ -52,7 +52,7 @@ const Profile = () => {
                         <h1 className="page-title">My Profile</h1>
                         <div className="profile-card">
                             <figure className="profile-photo">
-                                <img src={user.avatar ? user.avatar.url : null} alt={user.name} />
+                                <img src={user.avatar ? user.avatar.url : ''} alt={user.name} referrerPolicy="no-referrer" />
                             </figure>
                             <div>
                                 <p className="profile-label">Full name</p>

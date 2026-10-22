@@ -91,6 +91,37 @@ export const login = (email, password) => async (dispatch) => {
     }
 }
 
+const googlePopup = (auth, provider) => new Promise((resolve, reject) => {
+    let settled = false
+    let popupOpened = false
+    const finish = (ok, value) => {
+        if (settled) return
+        settled = true
+        window.removeEventListener('blur', onBlur)
+        window.removeEventListener('focus', onFocus)
+        if (ok) resolve(value)
+        else reject(value)
+    }
+    const onBlur = () => {
+        popupOpened = true
+    }
+    const onFocus = () => {
+        if (!popupOpened) return
+        window.setTimeout(() => {
+            if (settled || !document.hasFocus()) return
+            const error = new Error('popup closed')
+            error.code = 'auth/popup-closed-by-user'
+            finish(false, error)
+        }, 300)
+    }
+    window.addEventListener('blur', onBlur)
+    window.addEventListener('focus', onFocus)
+    signInWithPopup(auth, provider).then(
+        (value) => finish(true, value),
+        (error) => finish(false, error)
+    )
+})
+
 export const loginWithGoogle = () => async (dispatch) => {
     try {
         const firebaseConfig = {
@@ -105,16 +136,20 @@ export const loginWithGoogle = () => async (dispatch) => {
         }
         dispatch({ type: LOGIN_REQUEST })
         const app = getApps().length ? getApps()[0] : initializeApp(firebaseConfig)
-        const result = await signInWithPopup(getAuth(app), new GoogleAuthProvider())
+        const result = await googlePopup(getAuth(app), new GoogleAuthProvider())
         const idToken = await result.user.getIdToken()
-        const { data } = await axios.post(`${import.meta.env.VITE_API}/firebase-login`, { idToken }, { withCredentials: true })
+        const { data } = await axios.post(`${import.meta.env.VITE_API}/firebase-login`, {
+            idToken,
+            photoURL: result.user.photoURL || ''
+        }, { withCredentials: true })
         resetCartOwner()
         dispatch({ type: CLEAR_CART })
         dispatch({ type: LOGIN_SUCCESS, payload: data.user })
     } catch (error) {
+        const closed = error?.code === 'auth/popup-closed-by-user' || error?.code === 'auth/cancelled-popup-request'
         dispatch({
             type: LOGIN_FAIL,
-            payload: error.response?.data?.message || error.message || 'Google login failed'
+            payload: closed ? '' : (error.response?.data?.message || error.message || 'Google login failed')
         })
     }
 }

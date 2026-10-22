@@ -38,7 +38,6 @@ import OfferQueue from './Components/Admin/OfferQueue';
 import ProductReviews from './Components/Admin/ProductReviews';
 import NewOffer from './Components/Offer/NewOffer';
 import MyOffers from './Components/Offer/MyOffers';
-import ForgotPassword from './Components/User/ForgotPassword';
 function App() {
   const dispatch = useDispatch()
   const { user, isAuthenticated } = useSelector(state => state.auth)
@@ -64,8 +63,6 @@ function App() {
           <Route path="/search/:keyword" element={<CustomerRoute><Home /></CustomerRoute>} exact="true" />
           <Route path="/login" element={<Login />} exact="true" />
           <Route path="/register" element={<CustomerRoute><Register /></CustomerRoute>} />
-          <Route path="/password/forgot" element={<ForgotPassword />} />
-          <Route path="/password/reset/:token" element={<ForgotPassword />} />
           <Route path="/me" element={<CustomerRoute><Profile /></CustomerRoute>} exact="true" />
           <Route path="/me/update" element={<CustomerRoute><UpdateProfile /></CustomerRoute>} exact="true" />
           <Route path="/password/update" element={<CustomerRoute><UpdatePassword /></CustomerRoute>} />

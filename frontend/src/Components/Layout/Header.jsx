@@ -56,7 +56,7 @@ const Header = () => {
                     <div className="user-menu">
                         <button type="button" className="nav-user" onClick={() => setMenuOpen(open => !open)}>
                             <figure className="avatar-nav">
-                                {user.avatar?.url && <img src={user.avatar.url} alt={user.name} />}
+                                {user.avatar?.url && <img src={user.avatar.url} alt={user.name} referrerPolicy="no-referrer" />}
                             </figure>
                             <span>{user.name}</span>
                         </button>

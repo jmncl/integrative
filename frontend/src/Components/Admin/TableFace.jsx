@@ -1,6 +1,6 @@
 const TableFace = ({ image, title, note }) => (
     <span className="table-face">
-        <img src={image || '/images/no-photo.svg'} alt="" />
+        <img src={image || '/images/no-photo.svg'} alt="" referrerPolicy="no-referrer" />
         <span>
             <strong>{title}</strong>
             {note ? <small>{note}</small> : null}
