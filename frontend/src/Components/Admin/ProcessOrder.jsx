@@ -12,6 +12,7 @@ import { useDispatch, useSelector } from 'react-redux'
 import { getOrderDetails, updateOrder, clearErrors } from '../../actions/orderActions'
 import { UPDATE_ORDER_RESET } from '../../constants/orderConstants'
 import { peso } from '../../Utils/money'
+import { askConfirm } from '../../Utils/confirm'
 const ProcessOrder = () => {
     const dispatch = useDispatch();
     const { loading, order = {} } = useSelector(state => state.orderDetails)
@@ -87,14 +88,20 @@ const ProcessOrder = () => {
         }
     }, [error, isUpdated, orderId])
 
-    const updateOrderHandler = (id) => {
+    const updateOrderHandler = async (id) => {
+        const ok = await askConfirm('Update this order?', 'This saves the new status.')
+        if (!ok) return
         const formData = new FormData();
         formData.set('status', status);
         dispatch(updateOrder(id, formData))
     }
 
     const shippingDetails = shippingInfo && `${shippingInfo.address}, ${shippingInfo.city}, ${shippingInfo.postalCode}, ${shippingInfo.country}`
-    const isPaid = paymentInfo && paymentInfo.status === 'succeeded' ? true : false
+    const isPaid = paymentInfo && paymentInfo.status === 'succeeded'
+    const paymentType = !paymentInfo
+        ? 'Not set'
+        : paymentInfo.method
+            || (paymentInfo.id === 'cash' || String(paymentInfo.status || '').toLowerCase().includes('cash') ? 'Cash on delivery' : (paymentInfo.status === 'succeeded' ? 'Card' : 'Not set'))
     return (
         <>
             <MetaData title={`Process ${order?.code || (order?._id ? `JO${order._id}` : 'Order')}`} />
@@ -102,6 +109,10 @@ const ProcessOrder = () => {
                 <Sidebar />
                 <div className="admin-main">
                     <>
+                        <button type="button" className="back-btn" onClick={() => navigate(-1)}>
+                            <span className="back-btn-icon" aria-hidden="true"><i className="fa fa-angle-left"></i></span>
+                            Back
+                        </button>
                         {loading ? <Loader /> : (
                             <div className="row d-flex justify-content-around">
                                 <div className="col-12 col-lg-7 order-details">
@@ -113,10 +124,8 @@ const ProcessOrder = () => {
                                     <p><b>Amount:</b> {peso(totalPrice)}</p>
                                     <hr />
                                     <h4 className="my-4">Payment</h4>
+                                    <p><b>Type:</b> {paymentType}</p>
                                     <p className={isPaid ? "greenColor" : "redColor"}><b>{isPaid ? "PAID" : "NOT PAID"}</b></p>
-                                    <h4 className="my-4">Stripe ID</h4>
-                                    <p><b>{paymentInfo && paymentInfo.id}</b></p>
-
                                     <h4 className="my-4">Order Status:</h4>
                                     <p className={order.orderStatus && String(order.orderStatus).includes('Delivered') ? "greenColor" : "redColor"} ><b>{orderStatus}</b></p>
                                     <h4 className="my-4">Order Items:</h4>

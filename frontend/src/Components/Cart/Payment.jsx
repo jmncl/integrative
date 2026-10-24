@@ -67,8 +67,8 @@ const Payment = () => {
         e.preventDefault();
         document.querySelector('#pay_btn').disabled = true;
         order.paymentInfo = paymentMethod === 'cash'
-            ? { id: 'cash', status: 'Cash on delivery' }
-            : { id: 'pi_1DpdYh2eZvKYlo2CYIynhU32', status: 'succeeded' }
+            ? { id: 'cash', status: 'Cash on delivery', method: 'Cash on delivery' }
+            : { id: 'card', status: 'succeeded', method: 'Card' }
         dispatch(createOrder(order))
         toast.success('order created', {
             position: 'bottom-right'

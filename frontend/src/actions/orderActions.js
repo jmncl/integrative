@@ -83,11 +83,11 @@ export const getOrderDetails = (id) => async (dispatch) => {
     }
 }
 
-export const allOrders = () => async (dispatch) => {
+export const allOrders = (deleted = false) => async (dispatch) => {
 
     try {
         dispatch({ type: ALL_ORDERS_REQUEST });
-        const { data } = await axios.get(`${import.meta.env.VITE_API}/admin/orders`, {
+        const { data } = await axios.get(`${import.meta.env.VITE_API}/admin/orders${deleted ? '?deleted=1' : ''}`, {
             //AxiosRequestConfig parameter
             withCredentials: true //correct
         })
@@ -126,6 +126,25 @@ export const updateOrder = (id, orderData) => async (dispatch) => {
     }
 
 }
+export const deleteOrders = (ids) => async (dispatch) => {
+    try {
+        dispatch({ type: DELETE_ORDER_REQUEST })
+        const { data } = await axios.delete(`${import.meta.env.VITE_API}/admin/orders`, {
+            data: { ids },
+            withCredentials: true
+        })
+        dispatch({
+            type: DELETE_ORDER_SUCCESS,
+            payload: data.success
+        })
+    } catch (error) {
+        dispatch({
+            type: DELETE_ORDER_FAIL,
+            payload: error.response?.data?.message || 'Could not delete the orders'
+        })
+    }
+}
+
 export const deleteOrder = (id) => async (dispatch) => {
     try {
         dispatch({ type: DELETE_ORDER_REQUEST })

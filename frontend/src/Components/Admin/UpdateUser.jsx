@@ -4,6 +4,7 @@ import MetaData from '../Layout/MetaData'
 import Sidebar from './SideBar'
 
 import { errMsg, successMsg } from '../../Utils/helpers';
+import { askConfirm } from '../../Utils/confirm';
 
 import axios from 'axios';
 
@@ -54,13 +55,40 @@ const UpdateUser = () => {
             navigate('/admin/users')
         }
     }, [isUpdated])
-    const submitHandler = (e) => {
+    const submitHandler = async (e) => {
         e.preventDefault();
+        if (!user) return
+        const ok = await askConfirm('Save this user?', 'This updates the name and role.')
+        if (!ok) return
         const formData = new FormData();
         formData.set('name', name);
-        formData.set('email', email);
+        formData.set('email', user.email);
         formData.set('role', role);
         updateUser(user._id, formData)
+    }
+
+    const deactivate = async () => {
+        const ok = await askConfirm('Deactivate this user?', 'They will not be able to log in. Older orders stay as they are.')
+        if (!ok) return
+        try {
+            await axios.delete(`${import.meta.env.VITE_API}/admin/user/${user._id}`, { withCredentials: true })
+            successMsg('User deactivated')
+            getUserDetails(id)
+        } catch (error) {
+            errMsg(error.response?.data?.message || 'Could not deactivate that user')
+        }
+    }
+
+    const reactivate = async () => {
+        const ok = await askConfirm('Reactivate this user?', 'They will be able to log in again.')
+        if (!ok) return
+        try {
+            await axios.put(`${import.meta.env.VITE_API}/admin/users/restore`, { ids: [user._id] }, { withCredentials: true })
+            successMsg('User reactivated')
+            getUserDetails(id)
+        } catch (error) {
+            errMsg(error.response?.data?.message || 'Could not reactivate that user')
+        }
     }
 
     return (
@@ -69,14 +97,19 @@ const UpdateUser = () => {
             <div className="admin-shell">
                 <Sidebar />
                 <div className="admin-main">
+                    <button type="button" className="back-btn" onClick={() => navigate(-1)}>
+                        <span className="back-btn-icon" aria-hidden="true"><i className="fa fa-angle-left"></i></span>
+                        Back
+                    </button>
                     <div className="row wrapper">
                         <div className="col-10 col-lg-5">
                             <form className="shadow-lg" onSubmit={submitHandler}>
-                                <h1 className="mt-2 mb-5">Update User</h1>
+                                <h1 className="mt-2 mb-4">User</h1>
+                                {user?.avatar?.url && <img className="user-view-photo" src={user.avatar.url} alt="" referrerPolicy="no-referrer" />}
                                 <div className="form-group">
                                     <label htmlFor="name_field">Name</label>
                                     <input
-                                        type="name"
+                                        type="text"
                                         id="name_field"
                                         className="form-control"
                                         name='name'
@@ -85,30 +118,23 @@ const UpdateUser = () => {
                                     />
                                 </div>
                                 <div className="form-group">
-                                    <label htmlFor="email_field">Email</label>
-                                    <input
-                                        type="email"
-                                        id="email_field"
-                                        className="form-control"
-                                        name='email'
-                                        value={email}
-                                        onChange={(e) => setEmail(e.target.value)}
-                                    />
+                                    <label>Email</label>
+                                    <p className="photo-note">{email}</p>
                                 </div>
                                 <div className="form-group">
-                                    <label htmlFor="role_field">Role</label>
-                                    <select
-                                        id="role_field"
-                                        className="form-control"
-                                        name='role'
-                                        value={role}
-                                        onChange={(e) => setRole(e.target.value)}
-                                    >
-                                        <option value="user">user</option>
-                                        <option value="admin">admin</option>
-                                    </select>
+                                    <label>Role</label>
+                                    <div className="role-picks">
+                                        <button type="button" className={role === 'user' ? 'on' : ''} onClick={() => setRole('user')}>User</button>
+                                        <button type="button" className={role === 'admin' ? 'on' : ''} onClick={() => setRole('admin')}>Admin</button>
+                                    </div>
                                 </div>
-                                <button type="submit" className="btn update-btn btn-block mt-4 mb-3" >Update</button>
+                                <button type="submit" className="btn update-btn btn-block mt-4 mb-3">Update</button>
+                                {user?.deletedAt && <p className="photo-note">This account is deactivated.</p>}
+                                {user && (user.deletedAt ? (
+                                    <button type="button" className="account-toggle on" onClick={reactivate}><i className="fa fa-undo"></i> Reactivate</button>
+                                ) : (
+                                    <button type="button" className="account-toggle" onClick={deactivate}><i className="fa fa-ban"></i> Deactivate</button>
+                                ))}
                             </form>
                         </div>
                     </div>

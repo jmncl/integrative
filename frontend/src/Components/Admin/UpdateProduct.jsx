@@ -11,6 +11,7 @@ import axios from 'axios';
 import { useDispatch, useSelector } from 'react-redux'
 import { updateProduct, getProductDetails, clearErrors } from '../../actions/productActions'
 import { UPDATE_PRODUCT_RESET } from '../../constants/productConstants'
+import { askConfirm } from '../../Utils/confirm'
 
 
 const UpdateProduct = () => {
@@ -29,6 +30,7 @@ const UpdateProduct = () => {
     const [images, setImages] = useState([]);
     const [oldImages, setOldImages] = useState([]);
     const [imagesPreview, setImagesPreview] = useState([])
+    const [people, setPeople] = useState([])
     // const [error, setError] = useState('')
     // const [product, setProduct] = useState({})
     // const [loading, setLoading] = useState(true)
@@ -36,10 +38,13 @@ const UpdateProduct = () => {
     // const [isUpdated, setIsUpdated] = useState(false)
 
     const categories = [
-        'Shoes',
-        'Clothes',
-        'Accessories'
+        ['Shoes', 'Shoes'],
+        ['Clothes', 'Clothes'],
+        ['Accessories', 'Accessories'],
+        ['sale', 'For sale'],
+        ['trade', 'For trade']
     ]
+    const hand = category === 'sale' || category === 'trade'
     let { id } = useParams();
     let navigate = useNavigate();
 
@@ -80,14 +85,15 @@ const UpdateProduct = () => {
     //     }
     // }
     useEffect(() => {
-        if (product && product._id !== id) {
+        if (!product || String(product._id) !== String(id)) {
             dispatch(getProductDetails(id))
         } else {
+            const hand = product.listingType === 'sale' || product.listingType === 'trade'
             setName(product.name);
             setPrice(product.price);
             setDescription(product.description);
-            setCategory(product.category);
-            setSeller(product.seller);
+            setCategory(hand ? product.listingType : product.category);
+            setSeller(product.seller || '');
             setStock(product.stock)
             setSizes(product.sizes?.length ? product.sizes.map(size => ({ label: size.label, stock: size.stock })) : [{ label: 'One size', stock: product.stock }])
             setOldImages(product.images || [])
@@ -110,6 +116,13 @@ const UpdateProduct = () => {
         }
     }, [error, updateError, product, id, isUpdated])
 
+    useEffect(() => {
+        if (!hand) return
+        axios.get(`${import.meta.env.VITE_API}/admin/users`, { withCredentials: true })
+            .then(({ data }) => setPeople(data.users || []))
+            .catch(() => setPeople([]))
+    }, [hand])
+
     const submitHandler = async (e) => {
         e.preventDefault();
         const priceNumber = Number(price)
@@ -121,8 +134,8 @@ const UpdateProduct = () => {
             await yup.object({
                 name: yup.string().trim().required('Name is required'),
                 description: yup.string().trim().required('Description is required'),
-                seller: yup.string().trim().required('Seller is required'),
-                category: yup.string().oneOf(['Shoes', 'Clothes', 'Accessories']).required('Category is required'),
+                seller: yup.string().trim(),
+                category: yup.string().oneOf(['Shoes', 'Clothes', 'Accessories', 'sale', 'trade']).required('Category is required'),
                 price: yup.number().typeError('Price has to be a number').min(0, 'Price cannot be negative').required('Price is required')
             }).validate({ name, description, seller, category, price: priceNumber })
         } catch (validationError) {
@@ -141,11 +154,21 @@ const UpdateProduct = () => {
             toast.error('Add at least one photo', { position: 'bottom-right' })
             return
         }
+        const selling = category === 'sale' || category === 'trade'
+        const person = people.find(item => item.name.toLowerCase() === seller.trim().toLowerCase())
+        if (selling && !person) {
+            toast.error('Choose a seller from the list', { position: 'bottom-right' })
+            return
+        }
+        const ok = await askConfirm('Save these changes?', 'This updates the product in the shop.')
+        if (!ok) return
         dispatch(updateProduct(product._id, {
             name: name.trim(),
             price: priceNumber,
             description: description.trim(),
-            category,
+            category: selling ? 'Shoes' : category,
+            listingType: selling ? category : 'shop',
+            offeredBy: person?._id,
             stock: cleanedSizes.reduce((sum, size) => sum + size.stock, 0),
             sizes: cleanedSizes,
             seller: seller.trim(),
@@ -227,8 +250,8 @@ const UpdateProduct = () => {
                                 <div className="form-group">
                                     <label htmlFor="category_field">Category</label>
                                     <select className="form-control" id="category_field" value={category} onChange={(e) => setCategory(e.target.value)}>
-                                        {categories.map(category => (
-                                            <option key={category} value={category} >{category}</option>
+                                        {categories.map(([value, label]) => (
+                                            <option key={value} value={value}>{label}</option>
                                         ))}
                                     </select>
                                 </div>
@@ -256,16 +279,31 @@ const UpdateProduct = () => {
                                     <button type="button" className="btn" onClick={() => setSizes(old => [...old, { label: '', stock: '1' }])}>Add size</button>
                                     <p className="photo-note">{sizes.reduce((sum, size) => sum + (Number(size.stock) || 0), 0)} left in total</p>
                                 </div>
-                                <div className="form-group">
-                                    <label htmlFor="seller_field">Seller Name</label>
-                                    <input
-                                        type="text"
-                                        id="seller_field"
-                                        className="form-control"
-                                        value={seller}
-                                        onChange={(e) => setSeller(e.target.value)}
-                                    />
-                                </div>
+                                {hand && (
+                                    <div className="form-group">
+                                        <label htmlFor="seller_field">Who is selling</label>
+                                        <input
+                                            type="text"
+                                            id="seller_field"
+                                            className="form-control"
+                                            placeholder="Type a name from the list"
+                                            value={seller}
+                                            onChange={(e) => setSeller(e.target.value)}
+                                        />
+                                        {seller.trim() && (
+                                        <ul className="seller-list">
+                                            {people.filter(person => person.name.toLowerCase().includes(seller.trim().toLowerCase())).slice(0, 6).map(person => (
+                                                <li key={person._id}>
+                                                    <button type="button" onClick={() => setSeller(person.name)}>{person.name}</button>
+                                                </li>
+                                            ))}
+                                            {seller.trim() && !people.some(person => person.name.toLowerCase().includes(seller.trim().toLowerCase())) && (
+                                                <li className="photo-note">No one with that name</li>
+                                            )}
+                                        </ul>
+                                        )}
+                                    </div>
+                                )}
                                 <div className='form-group'>
                                     <label htmlFor="product_photos">Photos</label>
                                     <input id="product_photos" type='file' name='images' accept='image/*' onChange={onChange} multiple />

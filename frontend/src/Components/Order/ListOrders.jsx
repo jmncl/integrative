@@ -10,20 +10,15 @@ import { useDispatch, useSelector } from 'react-redux'
 import { myOrders, clearErrors } from '../../actions/orderActions'
 import { peso } from '../../Utils/money'
 import { orderCode } from '../../Utils/codes'
-
-import {
-
-    Button
-} from '@mui/material'
-
-
-import { DataGrid, } from '@mui/x-data-grid'
+import ScrollTable from '../Admin/ScrollTable'
+import TableBar from '../Admin/TableBar'
 
 const ListOrders = () => {
     // const [loading, setLoading] = useState(true)
     // const [error, setError] = useState('')
     const dispatch = useDispatch();
     const { loading, error, orders } = useSelector(state => state.myOrders);
+    const [query, setQuery] = useState('')
     // const [myOrdersList, setMyOrdersList] = useState([])
 
     // const myOrders = async () => {
@@ -83,49 +78,47 @@ const ListOrders = () => {
                     : <span style={{ color: 'red' }}>{params.value}</span>
         },
         {
-            field: 'actions',
-            headerName: 'Actions',
-            width: 120,
+            field: 'view',
+            headerName: '',
+            width: 70,
             sortable: false,
             filterable: false,
             renderCell: (params) => (
-                <Button
-                    component={Link}
-                    to={`/order/${params.id}`}
-                    variant="contained"
-                    size="small"
-                >
-                    <i className="fa fa-eye" />
-                </Button>
+                <Link to={`/order/${params.id}`} className="table-view" aria-label="View">
+                    <i className="fa fa-eye"></i>
+                </Link>
             )
         }
     ];
 
-    const rows = orders.map(order => ({
+    const needle = query.trim().toLowerCase()
+    const rows = (orders || []).map(order => ({
         id: order._id,
         code: orderCode(order),
         numOfItems: order.orderItems.length,
         amount: peso(order.totalPrice),
         status: order.orderStatus || ''
-    }));
+    })).filter(row => !needle || [row.code, row.amount, row.status].join(' ').toLowerCase().includes(needle));
 
 
 
     return (
         <>
             <MetaData title={'My Orders'} />
-            <h1 className="page-title my-5">My Orders</h1>
+            <div className="page-head my-5">
+                <h1 className="page-title">My Orders</h1>
+                <TableBar query={query} onQuery={setQuery} placeholder="Search orders" />
+            </div>
             {loading ? <Loader /> : (
                 <div style={{ width: '100%' }}>
-                    <DataGrid
+                    <ScrollTable
                         rows={rows}
                         columns={columns}
-
-                        pageSizeOptions={[5, 10, 25]}
-                        initialState={{ pagination: { paginationModel: { pageSize: 5 } } }}
+                        resetKey={query}
+                        rowHeight={72}
+                        disableColumnMenu
                         disableRowSelectionOnClick
                         getRowId={(row) => row.id}
-                        showToolbar
                     />
                 </div>
             )}

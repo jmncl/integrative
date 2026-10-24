@@ -62,6 +62,9 @@ exports.firebaseLogin = async (req, res) => {
         const photo = [person.photoUrl, provider.photoUrl, sentPhoto].find(url => String(url || '').startsWith('https://')) || ''
         const name = String(person.displayName || provider.displayName || 'Google User').slice(0, 30)
         let user = await User.findOne({ email: person.email })
+        if (user && user.deletedAt) {
+            return res.status(401).json({ message: 'Google login failed' })
+        }
         const avatar = {
             public_id: `google-${person.localId}`,
             url: photo || `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=111111&color=ffffff`
@@ -96,7 +99,7 @@ exports.loginUser = async (req, res, next) => {
     // Finding user in database
 
     let user = await User.findOne({ email }).select('+password')
-    if (!user) {
+    if (!user || user.deletedAt) {
         return res.status(401).json({ message: 'Invalid Email or Password' })
     }
 
@@ -228,28 +231,41 @@ exports.updatePassword = async (req, res, next) => {
 }
 
 exports.allUsers = async (req, res, next) => {
-    const users = await User.find();
+    const users = await User.find({
+        deletedAt: req.query.deleted === '1' ? { $ne: null } : null
+    });
     res.status(200).json({
         success: true,
         users
     })
 }
 
-exports.deleteUser = async (req, res, next) => {
-    const user = await User.findById(req.params.id);
-
+exports.deleteUser = async (req, res) => {
+    const user = await User.findOne({ _id: req.params.id, deletedAt: null })
     if (!user) {
         return res.status(401).json({ message: `User does not found with id: ${req.params.id}` })
-        // return next(new ErrorHandler(`User does not found with id: ${req.params.id}`))
     }
+    if (String(user._id) === String(req.user._id)) {
+        return res.status(400).json({ message: 'You cannot delete your own account' })
+    }
+    user.deletedAt = new Date()
+    await user.save({ validateBeforeSave: false })
+    return res.status(200).json({ success: true })
+}
 
-    if (user.avatar && user.avatar.public_id && user.avatar.public_id !== 'no-photo') {
-        await cloudinary.v2.uploader.destroy(user.avatar.public_id)
-    }
-    await User.findByIdAndDelete(req.params.id);
-    return res.status(200).json({
-        success: true,
-    })
+exports.restoreUsers = async (req, res) => {
+    const ids = Array.isArray(req.body.ids) ? req.body.ids.map(Number).filter(Number.isFinite) : []
+    if (!ids.length) return res.status(400).json({ success: false, message: 'Select at least one user' })
+    await User.updateMany({ _id: { $in: ids }, deletedAt: { $ne: null } }, { deletedAt: null })
+    return res.status(200).json({ success: true })
+}
+
+exports.deleteUsers = async (req, res) => {
+    const ids = Array.isArray(req.body.ids) ? req.body.ids.map(Number).filter(Number.isFinite) : []
+    const chosen = ids.filter(id => String(id) !== String(req.user._id))
+    if (!chosen.length) return res.status(400).json({ success: false, message: 'Select at least one user' })
+    await User.updateMany({ _id: { $in: chosen }, deletedAt: null }, { deletedAt: new Date() })
+    return res.status(200).json({ success: true })
 }
 
 exports.getUserDetails = async (req, res, next) => {

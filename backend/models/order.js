@@ -64,6 +64,9 @@ const orderSchema = mongoose.Schema({
         },
         status: {
             type: String
+        },
+        method: {
+            type: String
         }
     },
     paidAt: {
@@ -104,6 +107,10 @@ const orderSchema = mongoose.Schema({
     createdAt: {
         type: Date,
         default: Date.now
+    },
+    deletedAt: {
+        type: Date,
+        default: null
     }
 
 })

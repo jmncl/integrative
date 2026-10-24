@@ -1,27 +1,32 @@
-import React, { useEffect } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import React, { useEffect, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 
 import MetaData from '../Layout/MetaData'
 import Loader from '../Layout/Loader'
 import Sidebar from './SideBar'
 import { toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
-import { DataGrid, } from '@mui/x-data-grid'
-// import { getToken } from '../../Utils/helpers'
-// import axios from 'axios'
+import ScrollTable from './ScrollTable'
+import axios from 'axios'
 
 import { useDispatch, useSelector } from 'react-redux'
-import { allOrders, clearErrors, deleteOrder } from '../../actions/orderActions'
+import { allOrders, clearErrors, deleteOrders } from '../../actions/orderActions'
 import { DELETE_ORDER_RESET } from '../../constants/orderConstants'
 import { peso } from '../../Utils/money'
 import { orderCode } from '../../Utils/codes'
 import TableFace from './TableFace'
+import TableBar from './TableBar'
+import RowAction from './RowAction'
+import { askConfirm } from '../../Utils/confirm'
 
 const OrdersList = () => {
     let navigate = useNavigate();
     const dispatch = useDispatch();
     const { loading, error, orders } = useSelector(state => state.allOrders);
     const { isDeleted } = useSelector(state => state.order)
+    const [selection, setSelection] = useState({ type: 'include', ids: new Set() })
+    const [query, setQuery] = useState('')
+    const [showDeleted, setShowDeleted] = useState(false)
     // const [loading, setLoading] = useState(true)
     // const [error, setError] = useState('')
     // const [allOrders, setAllOrders] = useState([])
@@ -65,7 +70,7 @@ const OrdersList = () => {
     //     }
     // }
     useEffect(() => {
-        dispatch(allOrders())
+        dispatch(allOrders(showDeleted))
         if (error) {
             errMsg(error)
             dispatch(clearErrors())
@@ -76,9 +81,31 @@ const OrdersList = () => {
             dispatch({ type: DELETE_ORDER_RESET })
             // navigate('/admin/orders');
         }
-    }, [error, isDeleted])
-    const deleteOrderHandler = (id) => {
-        dispatch(deleteOrder(id))
+    }, [error, isDeleted, showDeleted])
+    const selectedIds = selection?.type === 'exclude'
+        ? (orders || []).map(order => order._id).filter(id => !selection.ids.has(id))
+        : [...(selection?.ids || [])]
+
+    const deleteSelected = async () => {
+        if (!selectedIds.length) return
+        const ok = await askConfirm('Delete selected orders?', 'They leave this list. The sales chart still counts them.')
+        if (!ok) return
+        dispatch(deleteOrders([...selectedIds]))
+        setSelection({ type: 'include', ids: new Set() })
+    }
+
+    const restoreIds = async (ids) => {
+        if (!ids.length) return
+        const ok = await askConfirm(ids.length > 1 ? 'Restore selected orders?' : 'Restore this order?', 'They will show in the orders list again.')
+        if (!ok) return
+        try {
+            await axios.put(`${import.meta.env.VITE_API}/admin/orders/restore`, { ids }, { withCredentials: true })
+            setSelection({ type: 'include', ids: new Set() })
+            successMsg(ids.length > 1 ? 'Orders restored' : 'Order restored')
+            dispatch(allOrders(showDeleted))
+        } catch (restoreError) {
+            errMsg(restoreError.response?.data?.message || 'Could not restore those orders')
+        }
     }
 
     const columns = [
@@ -114,25 +141,18 @@ const OrdersList = () => {
         },
 
         {
-            field: 'actions',
-            headerName: 'Actions',
-            width: 120,
+            field: 'view',
+            headerName: '',
+            width: 70,
             sortable: false,
             filterable: false,
             renderCell: (params) => (
-
-                <>
-                    <Link to={`/admin/order/${params.id}`} className="btn btn-primary py-1 px-2">
-                        <i className="fa fa-eye"></i>
-                    </Link>
-                    <button className="btn btn-danger py-1 px-2 ml-2" onClick={() => deleteOrderHandler(params.id)}>
-                        <i className="fa fa-trash"></i>
-                    </button>
-                </>
+                <RowAction showDeleted={showDeleted} to={`/admin/order/${params.id}`} onRestore={() => restoreIds([params.id])} />
             )
         }
     ];
-    const rows = orders.map(order => ({
+    const needle = query.trim().toLowerCase()
+    const rows = (orders || []).map(order => ({
         id: order._id,
         code: orderCode(order),
         image: order.orderItems?.[0]?.image || '',
@@ -140,7 +160,7 @@ const OrdersList = () => {
         amount: peso(order.totalPrice),
         status: order.orderStatus,
         created: new Date(order.createdAt || 0).getTime()
-    }))
+    })).filter(row => !needle || [row.code, row.status, row.amount].join(' ').toLowerCase().includes(needle))
 
     return (
         <>
@@ -149,23 +169,40 @@ const OrdersList = () => {
                 <Sidebar />
                 <div className="admin-main">
                     <>
-                        <h1 className="page-title">All Orders</h1>
+                        <div className="page-head">
+                            <h1 className="page-title">All Orders</h1>
+                            <TableBar
+                                query={query}
+                                onQuery={setQuery}
+                                placeholder="Search orders"
+                                showDeleted={showDeleted}
+                                onToggleDeleted={() => { setSelection({ type: 'include', ids: new Set() }); setShowDeleted(value => !value) }}
+                            />
+                        </div>
+                        {selectedIds.length > 0 && (
+                            <div className="delete-row">
+                                {showDeleted
+                                    ? <button type="button" className="catalog-edit" onClick={() => restoreIds(selectedIds)}>Restore selected</button>
+                                    : <button type="button" className="bulk-delete" onClick={deleteSelected}>Delete selected</button>}
+                            </div>
+                        )}
                         {loading ? <Loader /> : (
                             <div style={{ width: '100%' }}>
-                                <DataGrid
+                                <ScrollTable
                                     rows={rows}
                                     columns={columns}
-
+                                    resetKey={`${query}-${showDeleted}`}
                                     rowHeight={72}
                                     sortingOrder={['desc', 'asc']}
-                                    pageSizeOptions={[10, 25, 50]}
                                     initialState={{
-                                        pagination: { paginationModel: { pageSize: 10 } },
                                         sorting: { sortModel: [{ field: 'created', sort: 'desc' }] }
                                     }}
+                                    checkboxSelection
+                                    disableColumnMenu
                                     disableRowSelectionOnClick
+                                    rowSelectionModel={selection}
+                                    onRowSelectionModelChange={(model) => setSelection(model)}
                                     getRowId={(row) => row.id}
-                                    showToolbar
                                 />
                             </div>
                         )}

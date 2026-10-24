@@ -23,6 +23,18 @@ const shopVisible = {
     ]
 }
 
+const stillThere = { deletedAt: null }
+
+const openReviews = (reviews) => (reviews || []).filter(item => !item.deletedAt)
+
+const scoreReviews = (reviews) => {
+    const open = openReviews(reviews)
+    return {
+        numOfReviews: open.length,
+        ratings: open.length ? open.reduce((sum, item) => sum + Number(item.rating), 0) / open.length : 0
+    }
+}
+
 const viewerFromCookie = async (req) => {
     try {
         const token = req.cookies && req.cookies.token
@@ -88,16 +100,30 @@ exports.newProduct = async (req, res) => {
             return res.status(400).json({ success: false, message: 'Please add at least one photo' })
         }
         const sizes = cleanSizes(req.body.sizes, stock)
+        const hand = req.body.listingType === 'sale' || req.body.listingType === 'trade'
         req.body.price = price
         req.body.stock = sizes.reduce((sum, size) => sum + size.stock, 0)
         req.body.sizes = sizes
         req.body.images = images
         req.body.user = req.user.id
-        req.body.listingType = 'shop'
         req.body.status = 'approved'
-        req.body.offerNote = ''
-        req.body.condition = ''
-        delete req.body.offeredBy
+        if (hand) {
+            const seller = await User.findOne({ _id: Number(req.body.offeredBy), deletedAt: null })
+            if (!seller) {
+                return res.status(400).json({ success: false, message: 'Choose a seller from the list' })
+            }
+            req.body.seller = seller.name
+            req.body.offeredBy = seller._id
+            req.body.category = 'Shoes'
+            req.body.condition = 'Good'
+            req.body.offerNote = req.body.listingType === 'trade' ? 'Open to a trade.' : ''
+        } else {
+            req.body.listingType = 'shop'
+            req.body.seller = req.body.seller || 'J-Trade'
+            req.body.offerNote = ''
+            req.body.condition = ''
+            delete req.body.offeredBy
+        }
         const product = await Product.create(req.body)
         return res.status(201).json({
             success: true,
@@ -114,11 +140,14 @@ exports.newProduct = async (req, res) => {
 exports.getProducts = async (req, res) => {
 
     const resPerPage = 8;
-    const apiFeatures = new APIFeatures(Product.find(shopVisible).select('-reviews'), req.query).search().filter()
+    const base = req.query.listing === 'second'
+        ? { $and: [shopVisible, stillThere, { listingType: { $in: ['sale', 'trade'] }, status: 'approved' }] }
+        : { $and: [shopVisible, stillThere] }
+    const apiFeatures = new APIFeatures(Product.find(base).select('-reviews'), req.query).search().filter()
     const filteredCount = apiFeatures.query.clone().countDocuments()
     apiFeatures.pagination(resPerPage);
     const [productsCount, filteredProductsCount, products] = await Promise.all([
-        Product.countDocuments(shopVisible),
+        Product.countDocuments(base),
         filteredCount,
         apiFeatures.query
     ])
@@ -153,32 +182,38 @@ exports.getSingleProduct = async (req, res, next) => {
             message: 'Product not found'
         })
     }
-    if (product.status !== 'approved') {
-        const viewer = await viewerFromCookie(req)
-        const isOwner = viewer && product.offeredBy != null && String(viewer._id) === String(product.offeredBy)
-        const isAdmin = viewer && viewer.role === 'admin'
-        if (!isOwner && !isAdmin) {
-            return res.status(404).json({
-                success: false,
-                message: 'Product not found'
-            })
-        }
-    }
     const viewer = await viewerFromCookie(req)
+    const isOwner = viewer && product.offeredBy != null && String(viewer._id) === String(product.offeredBy)
+    const isAdmin = viewer && viewer.role === 'admin'
+    if (product.deletedAt && !isAdmin) {
+        return res.status(404).json({
+            success: false,
+            message: 'Product not found'
+        })
+    }
+    if (product.status !== 'approved' && !isOwner && !isAdmin) {
+        return res.status(404).json({
+            success: false,
+            message: 'Product not found'
+        })
+    }
     let canReview = false
     let myReview = null
+    const reviews = openReviews(product.reviews)
     if (viewer && viewer.role !== 'admin') {
         const bought = await Order.findOne({
             user: viewer._id,
             orderStatus: 'Delivered',
             'orderItems.product': product._id
         })
-        myReview = product.reviews.find(item => String(item.user) === String(viewer._id)) || null
+        myReview = reviews.find(item => String(item.user) === String(viewer._id)) || null
         canReview = Boolean(bought) || Boolean(myReview)
     }
+    const shown = typeof product.toObject === 'function' ? product.toObject() : { ...product }
+    shown.reviews = reviews
     return res.status(200).json({
         success: true,
-        product,
+        product: shown,
         canReview,
         myReview
     })
@@ -186,7 +221,11 @@ exports.getSingleProduct = async (req, res, next) => {
 
 exports.getAdminProducts = async (req, res, next) => {
 
-    const products = await Product.find({
+    const showingDeleted = req.query.deleted === '1'
+    const products = await Product.find(showingDeleted ? {
+        deletedAt: { $ne: null }
+    } : {
+        deletedAt: null,
         $nor: [
             { listingType: { $in: ['sale', 'trade'] }, status: { $in: ['pending', 'rejected'] } }
         ]
@@ -228,11 +267,25 @@ exports.updateProduct = async (req, res, next) => {
             }
             req.body.price = price
         }
-        delete req.body.listingType
-        delete req.body.status
-        delete req.body.offeredBy
-        delete req.body.offerNote
-        delete req.body.condition
+        const hand = req.body.listingType === 'sale' || req.body.listingType === 'trade'
+        if (hand) {
+            const seller = await User.findOne({ _id: Number(req.body.offeredBy), deletedAt: null })
+            if (!seller) {
+                return res.status(400).json({ success: false, message: 'Choose a seller from the list' })
+            }
+            req.body.seller = seller.name
+            req.body.offeredBy = seller._id
+            req.body.category = 'Shoes'
+            req.body.status = 'approved'
+            req.body.condition = product.condition || 'Good'
+            req.body.offerNote = req.body.listingType === 'trade' ? (product.offerNote || 'Open to a trade.') : ''
+        } else {
+            delete req.body.listingType
+            delete req.body.status
+            delete req.body.offeredBy
+            delete req.body.offerNote
+            delete req.body.condition
+        }
         if (req.body.sizes || req.body.stock !== undefined) {
             const stock = Number(req.body.stock)
             const sizes = cleanSizes(req.body.sizes, Number.isFinite(stock) ? stock : product.stock)
@@ -257,23 +310,34 @@ exports.updateProduct = async (req, res, next) => {
     })
 }
 
+exports.restoreProducts = async (req, res) => {
+    const ids = Array.isArray(req.body.ids) ? req.body.ids.map(Number).filter(Number.isFinite) : []
+    if (!ids.length) {
+        return res.status(400).json({ success: false, message: 'Select at least one product' })
+    }
+    await Product.updateMany({ _id: { $in: ids }, deletedAt: { $ne: null } }, { deletedAt: null })
+    return res.status(200).json({ success: true, message: 'Products restored' })
+}
+
 exports.deleteProducts = async (req, res) => {
     const ids = Array.isArray(req.body.ids) ? req.body.ids.map(Number).filter(Number.isFinite) : []
     if (!ids.length) {
         return res.status(400).json({ success: false, message: 'Select at least one product' })
     }
-    await Product.deleteMany({ _id: { $in: ids } })
+    await Product.updateMany({ _id: { $in: ids }, deletedAt: null }, { deletedAt: new Date() })
     return res.status(200).json({ success: true, message: 'Products deleted' })
 }
 
 exports.deleteProduct = async (req, res, next) => {
-    const product = await Product.findByIdAndDelete(req.params.id);
+    const product = await Product.findOne({ _id: req.params.id, deletedAt: null })
     if (!product) {
         return res.status(404).json({
             success: false,
             message: 'Product not found'
         })
     }
+    product.deletedAt = new Date()
+    await product.save({ validateBeforeSave: false })
 
     return res.status(200).json({
         success: true,
@@ -293,7 +357,7 @@ exports.createProductReview = async (req, res) => {
             return res.status(400).json({ success: false, message: 'Choose 1 to 5 stars and write a review' })
         }
         const product = await Product.findById(productId)
-        if (!product || product.status !== 'approved') {
+        if (!product || product.deletedAt || product.status !== 'approved') {
             return res.status(404).json({ success: false, message: 'Product not found' })
         }
         const bought = await Order.findOne({
@@ -301,7 +365,7 @@ exports.createProductReview = async (req, res) => {
             orderStatus: 'Delivered',
             'orderItems.product': productId
         })
-        const existing = product.reviews.find(item => String(item.user) === String(req.user._id))
+        const existing = openReviews(product.reviews).find(item => String(item.user) === String(req.user._id))
         if (!bought && !existing) {
             return res.status(403).json({ success: false, message: 'You can review this after the order is delivered' })
         }
@@ -319,8 +383,9 @@ exports.createProductReview = async (req, res) => {
                 comment
             })
         }
-        product.numOfReviews = product.reviews.length
-        product.ratings = product.reviews.reduce((sum, item) => sum + Number(item.rating), 0) / product.reviews.length
+        const score = scoreReviews(product.reviews)
+        product.numOfReviews = score.numOfReviews
+        product.ratings = score.ratings
         await product.save({ validateBeforeSave: false })
         return res.status(200).json({ success: true })
     } catch (error) {
@@ -335,7 +400,7 @@ exports.getProductReviews = async (req, res, next) => {
     }
     res.status(200).json({
         success: true,
-        reviews: product.reviews
+        reviews: openReviews(product.reviews)
     })
 }
 
@@ -344,7 +409,10 @@ exports.getAdminReviews = async (req, res) => {
     const userIds = [...new Set(products.flatMap(product => product.reviews.map(review => review.user)))]
     const users = await User.find({ _id: { $in: userIds } }).select('name avatar')
     const byUser = Object.fromEntries(users.map(person => [String(person._id), person]))
-    const reviews = products.flatMap(product => product.reviews.map(review => {
+    const visibleReviews = req.query.deleted === '1'
+        ? (list) => (list || []).filter(item => item.deletedAt)
+        : openReviews
+    const reviews = products.flatMap(product => visibleReviews(product.reviews).map(review => {
         const person = byUser[String(review.user)]
         return {
             _id: review._id,
@@ -362,29 +430,74 @@ exports.getAdminReviews = async (req, res) => {
     res.status(200).json({ success: true, reviews })
 }
 
-exports.deleteReview = async (req, res, next) => {
-    console.log(req.query)
-    const product = await Product.findById(req.query.productId);
-    const reviews = product.reviews.filter(review => review._id.toString() !== req.query.id.toString());
-    const numOfReviews = reviews.length;
+exports.deleteReview = async (req, res) => {
+    const product = await Product.findById(req.query.productId)
+    if (!product) return res.status(404).json({ success: false, message: 'Product not found' })
+    const review = product.reviews.find(item => item._id.toString() === req.query.id.toString())
+    if (!review || review.deletedAt) return res.status(404).json({ success: false, message: 'Review not found' })
+    review.deletedAt = new Date()
+    const score = scoreReviews(product.reviews)
+    product.numOfReviews = score.numOfReviews
+    product.ratings = score.ratings
+    product.markModified('reviews')
+    await product.save({ validateBeforeSave: false })
+    return res.status(200).json({ success: true })
+}
 
-    const ratings = numOfReviews
-        ? reviews.reduce((acc, item) => acc + Number(item.rating), 0) / numOfReviews
-        : 0
-
-    await Product.findByIdAndUpdate(req.query.productId, {
-        reviews,
-        ratings,
-        numOfReviews
-    }, {
-        new: true,
-        runValidators: true,
-        useFindAndModify: false
+exports.restoreReviews = async (req, res) => {
+    const items = Array.isArray(req.body.items) ? req.body.items : []
+    if (!items.length) return res.status(400).json({ success: false, message: 'Select at least one review' })
+    const byProduct = new Map()
+    items.forEach(item => {
+        const productId = Number(item.productId)
+        const id = Number(item.id)
+        if (!Number.isFinite(productId) || !Number.isFinite(id)) return
+        const list = byProduct.get(productId) || []
+        list.push(id)
+        byProduct.set(productId, list)
     })
+    for (const [productId, ids] of byProduct) {
+        const product = await Product.findById(productId)
+        if (!product) continue
+        const chosen = new Set(ids.map(String))
+        product.reviews.forEach(review => {
+            if (chosen.has(String(review._id)) && review.deletedAt) review.deletedAt = null
+        })
+        const score = scoreReviews(product.reviews)
+        product.numOfReviews = score.numOfReviews
+        product.ratings = score.ratings
+        product.markModified('reviews')
+        await product.save({ validateBeforeSave: false })
+    }
+    return res.status(200).json({ success: true })
+}
 
-    return res.status(200).json({
-        success: true
+exports.deleteReviews = async (req, res) => {
+    const items = Array.isArray(req.body.items) ? req.body.items : []
+    if (!items.length) return res.status(400).json({ success: false, message: 'Select at least one review' })
+    const byProduct = new Map()
+    items.forEach(item => {
+        const productId = Number(item.productId)
+        const id = Number(item.id)
+        if (!Number.isFinite(productId) || !Number.isFinite(id)) return
+        const list = byProduct.get(productId) || []
+        list.push(id)
+        byProduct.set(productId, list)
     })
+    for (const [productId, ids] of byProduct) {
+        const product = await Product.findById(productId)
+        if (!product) continue
+        const chosen = new Set(ids.map(String))
+        product.reviews.forEach(review => {
+            if (chosen.has(String(review._id)) && !review.deletedAt) review.deletedAt = new Date()
+        })
+        const score = scoreReviews(product.reviews)
+        product.numOfReviews = score.numOfReviews
+        product.ratings = score.ratings
+        product.markModified('reviews')
+        await product.save({ validateBeforeSave: false })
+    }
+    return res.status(200).json({ success: true })
 }
 
 exports.productSales = async (req, res) => {
@@ -493,12 +606,35 @@ exports.newOffer = async (req, res) => {
     }
 }
 
+exports.restoreMyOffers = async (req, res) => {
+    const ids = Array.isArray(req.body.ids) ? req.body.ids.map(Number).filter(Number.isFinite) : []
+    if (!ids.length) return res.status(400).json({ success: false, message: 'Select at least one offer' })
+    await Product.updateMany(
+        { _id: { $in: ids }, offeredBy: req.user._id, deletedAt: { $ne: null } },
+        { deletedAt: null }
+    )
+    return res.status(200).json({ success: true })
+}
+
+exports.deleteMyOffers = async (req, res) => {
+    const ids = Array.isArray(req.body.ids) ? req.body.ids.map(Number).filter(Number.isFinite) : []
+    if (!ids.length) return res.status(400).json({ success: false, message: 'Select at least one offer' })
+    await Product.updateMany(
+        { _id: { $in: ids }, offeredBy: req.user._id, deletedAt: null },
+        { deletedAt: new Date() }
+    )
+    return res.status(200).json({ success: true })
+}
+
 exports.myOffers = async (req, res) => {
     try {
         if (!req.user || req.user.role === 'admin') {
             return res.status(403).json({ success: false, message: 'Admins do not sell as customers' })
         }
-        const offers = await Product.find({ offeredBy: req.user._id }).sort({ createdAt: -1 })
+        const offers = await Product.find({
+            offeredBy: req.user._id,
+            deletedAt: req.query.deleted === '1' ? { $ne: null } : null
+        }).sort({ createdAt: -1 })
         return res.status(200).json({
             success: true,
             offers
@@ -513,7 +649,12 @@ exports.myOffers = async (req, res) => {
 
 exports.getPendingOffers = async (req, res) => {
     try {
-        const offers = await Product.find({
+        const showingDeleted = req.query.deleted === '1'
+        const offers = await Product.find(showingDeleted ? {
+            deletedAt: { $ne: null },
+            listingType: { $in: ['sale', 'trade'] }
+        } : {
+            deletedAt: null,
             status: 'pending',
             listingType: { $in: ['sale', 'trade'] }
         }).populate('offeredBy', 'name email').sort({ createdAt: -1, _id: -1 })

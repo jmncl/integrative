@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react'
-import { Link } from 'react-router-dom'
+import RowAction from './RowAction'
 
 import MetaData from '../Layout/MetaData'
 import Loader from '../Layout/Loader'
@@ -7,16 +7,22 @@ import Sidebar from './SideBar'
 
 import axios from 'axios';
 import { errMsg, successMsg } from '../../Utils/helpers';
-import { DataGrid } from '@mui/x-data-grid'
+import ScrollTable from './ScrollTable'
 import TableFace from './TableFace'
+import TableBar from './TableBar'
+import { askConfirm } from '../../Utils/confirm'
 
 const UsersList = () => {
     const [loading, setLoading] = useState(true)
     const [allUsers, setAllUsers] = useState([])
     const [isDeleted, setIsDeleted] = useState(false)
-    const listUsers = async () => {
+    const [selection, setSelection] = useState({ type: 'include', ids: new Set() })
+    const [query, setQuery] = useState('')
+    const [showDeleted, setShowDeleted] = useState(false)
+    const listUsers = async (deleted = showDeleted) => {
+        setLoading(true)
         try {
-            const { data } = await axios.get(`${import.meta.env.VITE_API}/admin/users`, {
+            const { data } = await axios.get(`${import.meta.env.VITE_API}/admin/users${deleted ? '?deleted=1' : ''}`, {
                 withCredentials: true
             })
             setAllUsers(data.users)
@@ -26,32 +32,51 @@ const UsersList = () => {
             setLoading(false)
         }
     }
-    const deleteUser = async (id) => {
-        try {
-            const { data } = await axios.delete(`${import.meta.env.VITE_API}/admin/user/${id}`, {
-                withCredentials: true
-            })
-            setIsDeleted(data.success)
-        } catch (error) {
-            errMsg(error.response?.data?.message || 'Could not delete that user')
-        }
-    }
-
     useEffect(() => {
-        listUsers()
-    }, [])
+        listUsers(showDeleted)
+    }, [showDeleted])
 
     useEffect(() => {
         if (isDeleted) {
-            successMsg('User deleted successfully')
+            successMsg('Users deactivated')
             setIsDeleted(false)
             listUsers()
         }
     }, [isDeleted])
 
 
-    const deleteUserHandler = (id) => {
-        deleteUser(id)
+    const selectedIds = selection?.type === 'exclude'
+        ? allUsers.map(user => user._id).filter(id => !selection.ids.has(id))
+        : [...(selection?.ids || [])]
+
+    const deleteSelected = async () => {
+        if (!selectedIds.length) return
+        const ok = await askConfirm('Deactivate selected users?', 'They cannot log in after this. Older orders still show their name.')
+        if (!ok) return
+        try {
+            await axios.delete(`${import.meta.env.VITE_API}/admin/users`, {
+                data: { ids: selectedIds },
+                withCredentials: true
+            })
+            setSelection({ type: 'include', ids: new Set() })
+            setIsDeleted(true)
+        } catch (error) {
+            errMsg(error.response?.data?.message || 'Could not deactivate those users')
+        }
+    }
+
+    const restoreIds = async (ids) => {
+        if (!ids.length) return
+        const ok = await askConfirm(ids.length > 1 ? 'Reactivate selected users?' : 'Reactivate this user?', 'They will be able to log in again.')
+        if (!ok) return
+        try {
+            await axios.put(`${import.meta.env.VITE_API}/admin/users/restore`, { ids }, { withCredentials: true })
+            setSelection({ type: 'include', ids: new Set() })
+            successMsg(ids.length > 1 ? 'Users reactivated' : 'User reactivated')
+            listUsers(showDeleted)
+        } catch (error) {
+            errMsg(error.response?.data?.message || 'Could not reactivate those users')
+        }
     }
 
     const columns = [
@@ -83,24 +108,22 @@ const UsersList = () => {
         },
 
         {
-            field: 'actions',
-            headerName: 'Actions',
-            width: 120,
+            field: 'view',
+            headerName: '',
+            width: 70,
             sortable: false,
             filterable: false,
             renderCell: (params) => (
-
-                <>
-                    <Link to={`/admin/user/${params.id}`} className="btn btn-primary py-1 px-2">
-                        <i className="fa fa-pencil"></i>
-                    </Link>
-                    <button className="btn btn-danger py-1 px-2 ml-2" onClick={() => deleteUserHandler(params.id)}>
-                        <i className="fa fa-trash"></i>
-                    </button>
-                </>
+                <RowAction
+                    showDeleted={showDeleted}
+                    to={`/admin/user/${params.id}`}
+                    restoreLabel="Reactivate"
+                    onRestore={() => restoreIds([params.id])}
+                />
             )
         }
     ];
+    const needle = query.trim().toLowerCase()
     const rows = allUsers.map(user => ({
         id: user._id,
         name: user.name,
@@ -108,6 +131,7 @@ const UsersList = () => {
         email: user.email,
         role: user.role,
     })).sort((a, b) => Number(a.id) - Number(b.id))
+        .filter(row => !needle || [`UID${row.id}`, row.name, row.email, row.role].join(' ').toLowerCase().includes(needle))
 
     return (
         <>
@@ -116,23 +140,41 @@ const UsersList = () => {
                 <Sidebar />
                 <div className="admin-main">
                     <>
-                        <h1 className="page-title">All Users</h1>
+                        <div className="page-head">
+                            <h1 className="page-title">All Users</h1>
+                            <TableBar
+                                query={query}
+                                onQuery={setQuery}
+                                placeholder="Search users"
+                                showDeleted={showDeleted}
+                                toggleLabel="Deactivated"
+                                onToggleDeleted={() => { setSelection({ type: 'include', ids: new Set() }); setShowDeleted(value => !value) }}
+                            />
+                        </div>
+                        {selectedIds.length > 0 && (
+                            <div className="delete-row">
+                                {showDeleted
+                                    ? <button type="button" className="catalog-edit" onClick={() => restoreIds(selectedIds)}>Reactivate selected</button>
+                                    : <button type="button" className="bulk-delete" onClick={deleteSelected}>Deactivate selected</button>}
+                            </div>
+                        )}
                         {loading ? <Loader /> : (
                             <div style={{ width: '100%' }}>
-                                <DataGrid
+                                <ScrollTable
                                     rows={rows}
                                     columns={columns}
-
+                                    resetKey={`${query}-${showDeleted}`}
                                     rowHeight={72}
                                     sortingOrder={['asc', 'desc']}
-                                    pageSizeOptions={[10, 25, 50]}
                                     initialState={{
-                                        pagination: { paginationModel: { pageSize: 10 } },
                                         sorting: { sortModel: [{ field: 'id', sort: 'asc' }] }
                                     }}
+                                    checkboxSelection
+                                    disableColumnMenu
                                     disableRowSelectionOnClick
+                                    rowSelectionModel={selection}
+                                    onRowSelectionModelChange={(model) => setSelection(model)}
                                     getRowId={(row) => row.id}
-                                    showToolbar
                                 />
                             </div>
                         )}

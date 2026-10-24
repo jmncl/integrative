@@ -14,6 +14,9 @@ exports.isAuthenticatedUser = async (req, res, next) => {
 
     const decoded = jwt.verify(token, process.env.JWT_SECRET)
     req.user = await User.findById(decoded.id);
+    if (!req.user || req.user.deletedAt) {
+        return res.status(401).json({ message: 'Login first to access this resource' })
+    }
 
     next()
 };

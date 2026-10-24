@@ -24,15 +24,23 @@ const Home = () => {
     const category = searchParams.get('category') || ''
     const rating = Number(searchParams.get('rating') || 0)
     const reviews = searchParams.get('reviews') || ''
-    const filterKey = [keyword || '', category, rating, reviews, priceMin, priceMax].join('|')
+    const hand = searchParams.get('hand') || ''
+    const filterKey = [keyword || '', category, rating, reviews, priceMin, priceMax, hand].join('|')
     const priceFiltered = priceMin > 1 || priceMax < 25000
-    const count = (keyword || category || rating || reviews || priceFiltered) ? filteredProductsCount : productsCount
-    const browseClear = !keyword && !category && !rating && !reviews && !priceFiltered
+    const count = (keyword || category || rating || reviews || priceFiltered || hand) ? filteredProductsCount : productsCount
+    const browseClear = !keyword && !category && !rating && !reviews && !priceFiltered && !hand
 
     const chooseCategory = (value) => {
         const next = new URLSearchParams(searchParams)
         if (value) next.set('category', value)
         else next.delete('category')
+        setSearchParams(next)
+    }
+
+    const chooseHand = (value) => {
+        const next = new URLSearchParams(searchParams)
+        if (value) next.set('hand', value)
+        else next.delete('hand')
         setSearchParams(next)
     }
 
@@ -54,8 +62,8 @@ const Home = () => {
                 return
             }
         }
-        dispatch(getProducts(page, keyword, [priceMin, priceMax], category, rating, reviews, !filtersChanged && page > 1))
-    }, [dispatch, page, filterKey, keyword, priceMin, priceMax, category, rating, reviews])
+        dispatch(getProducts(page, keyword, [priceMin, priceMax], category, rating, reviews, !filtersChanged && page > 1, hand === 'second' ? 'second' : ''))
+    }, [dispatch, page, filterKey, keyword, priceMin, priceMax, category, rating, reviews, hand])
 
     useEffect(() => {
         if (loading || !sentinel.current) return
@@ -92,6 +100,7 @@ const Home = () => {
                         {item}
                     </button>
                 ))}
+                <button type="button" className={hand === 'second' ? 'active' : ''} onClick={() => chooseHand(hand === 'second' ? '' : 'second')}>Second Hand</button>
             </div>
             {loading && !products.length ? <Loader /> : error ? (
                 <p className="empty-note">The product list is unavailable right now.</p>

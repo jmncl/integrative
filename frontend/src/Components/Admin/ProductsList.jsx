@@ -9,11 +9,10 @@ import { getToken } from '../../Utils/helpers';
 import axios from 'axios'
 import { toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
-import { DataGrid, } from '@mui/x-data-grid'
+import ScrollTable from './ScrollTable'
 import { useDispatch, useSelector } from 'react-redux'
 import {
     getAdminProducts,
-    deleteProduct,
     deleteProducts,
     clearErrors,
 } from '../../actions/productActions'
@@ -21,12 +20,17 @@ import { DELETE_PRODUCT_RESET } from '../../constants/productConstants'
 import { peso } from '../../Utils/money'
 import { productCode } from '../../Utils/codes'
 import TableFace from './TableFace'
+import TableBar from './TableBar'
+import RowAction from './RowAction'
+import { askConfirm } from '../../Utils/confirm'
 
 const ProductsList = () => {
     const dispatch = useDispatch();
     const { loading, error, products } = useSelector(state => state.products)
     const { error: deleteError, isDeleted } = useSelector(state => state.product)
     const [selection, setSelection] = useState({ type: 'include', ids: new Set() })
+    const [query, setQuery] = useState('')
+    const [showDeleted, setShowDeleted] = useState(false)
 
     // const [products, setProducts] = useState([])
     // const [error, setError] = useState('')
@@ -57,7 +61,7 @@ const ProductsList = () => {
     //     }
     // }
     useEffect(() => {
-        dispatch(getAdminProducts())
+        dispatch(getAdminProducts(showDeleted))
 
         if (error) {
             toast.error(error, {
@@ -82,7 +86,7 @@ const ProductsList = () => {
 
         }
 
-    }, [error, deleteError, isDeleted,])
+    }, [error, deleteError, isDeleted, showDeleted])
 
     // const deleteProduct = async (id) => {
     //     try {
@@ -101,17 +105,29 @@ const ProductsList = () => {
 
     //     }
     // }
-    const deleteProductHandler = (id) => {
-        dispatch(deleteProduct(id))
-    }
-
     const selectedIds = selection?.type === 'exclude'
         ? (products || []).map(product => product._id).filter(id => !selection.ids.has(id))
         : [...(selection?.ids || [])]
 
-    const deleteSelected = () => {
+    const deleteSelected = async () => {
         if (!selectedIds.length) return
+        const ok = await askConfirm('Delete selected products?', 'They will be hidden from new sales. Older orders stay as they are.')
+        if (!ok) return
         dispatch(deleteProducts(selectedIds))
+    }
+
+    const restoreIds = async (ids) => {
+        if (!ids.length) return
+        const ok = await askConfirm(ids.length > 1 ? 'Restore selected products?' : 'Restore this product?', 'They will show in the shop again.')
+        if (!ok) return
+        try {
+            await axios.put(`${import.meta.env.VITE_API}/admin/products/restore`, { ids }, { withCredentials: true })
+            setSelection({ type: 'include', ids: new Set() })
+            toast.success(ids.length > 1 ? 'Products restored' : 'Product restored', { position: 'bottom-right' })
+            dispatch(getAdminProducts(showDeleted))
+        } catch (restoreError) {
+            toast.error(restoreError.response?.data?.message || 'Could not restore those products', { position: 'bottom-right' })
+        }
     }
 
     const columns = [
@@ -147,32 +163,26 @@ const ProductsList = () => {
         },
 
         {
-            field: 'actions',
-            headerName: 'Actions',
-            width: 120,
+            field: 'view',
+            headerName: '',
+            width: 70,
             sortable: false,
             filterable: false,
             renderCell: (params) => (
-                <>
-                    <Link to={`/admin/product/${params.id}`} className="btn btn-primary py-1 px-2">
-                        <i className="fa fa-pencil"></i>
-                    </Link>
-                    <button className="btn btn-danger py-1 px-2 ml-2" onClick={() => deleteProductHandler(params.id)}>
-                        <i className="fa fa-trash"></i>
-                    </button>
-                </>
+                <RowAction showDeleted={showDeleted} to={`/product/${params.id}`} onRestore={() => restoreIds([params.id])} />
             )
         }
     ];
 
-    const rows = products.map(product => ({
+    const needle = query.trim().toLowerCase()
+    const rows = (products || []).map(product => ({
         id: product._id,
         code: productCode(product),
         name: product.name,
         image: product.images?.[0]?.url || '',
         price: peso(product.price),
         stock: `${product.stock} left`,
-    }))
+    })).filter(row => !needle || [row.code, row.name, row.price, row.stock].join(' ').toLowerCase().includes(needle))
 
     return (
         <>
@@ -183,31 +193,42 @@ const ProductsList = () => {
                     <>
                         <div className="page-head">
                             <h1 className="page-title">All Products</h1>
-                            <div className="page-actions">
-                                <button type="button" className="bulk-delete" disabled={!selectedIds.length} onClick={deleteSelected}>Delete selected</button>
+                            <div className="head-actions">
+                                <TableBar
+                                    query={query}
+                                    onQuery={setQuery}
+                                    placeholder="Search products"
+                                    showDeleted={showDeleted}
+                                    onToggleDeleted={() => { setSelection({ type: 'include', ids: new Set() }); setShowDeleted(value => !value) }}
+                                />
                                 <Link to="/admin/product" className="add-product">Add product</Link>
                             </div>
                         </div>
+                        {selectedIds.length > 0 && (
+                            <div className="delete-row">
+                                {showDeleted
+                                    ? <button type="button" className="catalog-edit" onClick={() => restoreIds(selectedIds)}>Restore selected</button>
+                                    : <button type="button" className="bulk-delete" onClick={deleteSelected}>Delete selected</button>}
+                            </div>
+                        )}
 
                         {loading ? <Loader /> : (
                             <div style={{ width: '100%' }}>
-                                <DataGrid
+                                <ScrollTable
                                     rows={rows}
                                     columns={columns}
-
+                                    resetKey={`${query}-${showDeleted}`}
                                     rowHeight={72}
                                     sortingOrder={['desc', 'asc']}
-                                    pageSizeOptions={[10, 25, 50]}
                                     initialState={{
-                                        pagination: { paginationModel: { pageSize: 10 } },
                                         sorting: { sortModel: [{ field: 'id', sort: 'desc' }] }
                                     }}
                                     checkboxSelection
+                                    disableColumnMenu
                                     disableRowSelectionOnClick
                                     rowSelectionModel={selection}
                                     onRowSelectionModelChange={(model) => setSelection(model)}
                                     getRowId={(row) => row.id}
-                                    showToolbar
                                 />
                             </div>
                         )}

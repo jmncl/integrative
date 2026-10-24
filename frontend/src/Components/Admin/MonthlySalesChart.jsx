@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { AreaChart, Area, CartesianGrid, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts'
+import { BarChart, Bar, CartesianGrid, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts'
 import axios from 'axios'
 import Loader from '../Layout/Loader'
 import { peso } from '../../Utils/money'
@@ -33,21 +33,16 @@ export default function MonthlySalesChart({ range = {} }) {
 
     return (
         <>
-            <p className="chart-total">{peso(total)} <span>across {sales.length} month{sales.length === 1 ? '' : 's'}</span></p>
+            <p className="chart-total">{peso(total)} <span>from paid orders in this range</span></p>
+            <p className="panel-note">Each bar is one month. A short bar means fewer paid orders. A month with no sales stays at zero.</p>
             <ResponsiveContainer width="100%" height={280}>
-                <AreaChart data={sales} margin={{ top: 8, right: 12, bottom: 0, left: 8 }}>
-                    <defs>
-                        <linearGradient id="salesFill" x1="0" y1="0" x2="0" y2="1">
-                            <stop offset="0%" stopColor="#c8102e" stopOpacity={0.35} />
-                            <stop offset="100%" stopColor="#c8102e" stopOpacity={0.02} />
-                        </linearGradient>
-                    </defs>
+                <BarChart data={sales} margin={{ top: 8, right: 12, bottom: 0, left: 8 }}>
                     <CartesianGrid stroke="#eee" vertical={false} />
                     <XAxis dataKey="month" tick={{ fontSize: 12, fill: '#333' }} tickLine={false} axisLine={{ stroke: '#e6e2dc' }} />
                     <YAxis tickFormatter={(value) => peso(value)} width={96} tick={{ fontSize: 12, fill: '#333' }} tickLine={false} axisLine={false} />
                     <Tooltip formatter={(value) => [peso(value), 'Sales']} />
-                    <Area type="monotone" dataKey="total" stroke="#c8102e" strokeWidth={2} fill="url(#salesFill)" />
-                </AreaChart>
+                    <Bar dataKey="total" fill="#c8102e" radius={[6, 6, 0, 0]} maxBarSize={42} />
+                </BarChart>
             </ResponsiveContainer>
         </>
     )

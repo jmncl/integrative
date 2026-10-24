@@ -435,8 +435,11 @@ const importData = async () => {
     buyers.forEach((person, index) => {
         const names = purchases.get(person._id) || []
         for (let start = 0; start < names.length; start += 3) {
-            const paidAt = new Date(2025, 5, 4)
-            paidAt.setDate(paidAt.getDate() + ((index * 11 + start) % 460))
+            const paidAt = new Date(2025, 5, 1)
+            const latest = new Date()
+            const days = Math.max(1, Math.round((latest - paidAt) / 86400000))
+            paidAt.setDate(paidAt.getDate() + ((index * 13 + start * 5) % (days + 1)))
+            paidAt.setHours(12, 0, 0, 0)
             deliveredOrders.push(makeOrder(
                 person,
                 addressFor(index),
@@ -513,25 +516,24 @@ const importData = async () => {
     }
 
     const createdOffers = await Product.create(['nico', 'jerome', 'jonel', 'marcus', 'miguel', 'joseph', 'regan', 'user'].flatMap((key, index) => {
-        const person = traders[key]
         const condition = ['Good', 'New', 'Fair'][index % 3]
         const saleStatus = ['pending', 'approved', 'rejected'][index % 3]
         const tradeStatus = ['approved', 'pending', 'rejected'][index % 3]
         return [
             offer(index, key, {
-                name: `${person.name} Air Jordan Sale`,
+                name: shoePhotos[index].name,
                 price: 4200 + index * 450,
-                description: `${person.name} is selling this pair. ${condition} condition.`,
-            listingType: 'sale',
+                description: `${condition} condition.`,
+                listingType: 'sale',
                 status: saleStatus,
                 condition,
                 sizes: [{ label: `US ${7 + (index % 5)}`, stock: 1 }]
             }),
             offer(index + 8, key, {
-                name: `${person.name} Jordan Trade`,
-            price: 0,
-                description: `${person.name} wants to trade this pair. ${condition} condition.`,
-            listingType: 'trade',
+                name: shoePhotos[index + 8].name,
+                price: 0,
+                description: `${condition} condition.`,
+                listingType: 'trade',
                 status: tradeStatus,
                 condition,
                 offerNote: 'Open to a clean Jordan in the same size.',
@@ -539,6 +541,27 @@ const importData = async () => {
             })
         ]
     }))
+
+    const extraHands = []
+    const sellerKeys = ['nico', 'jerome', 'jonel', 'marcus', 'miguel', 'joseph', 'regan', 'user']
+    for (let photoIndex = 16; photoIndex < Math.min(shoePhotos.length, 32); photoIndex += 1) {
+        const sale = photoIndex % 2 === 0
+        const condition = sale ? 'Good' : 'Fair'
+        extraHands.push(offer(photoIndex, sellerKeys[photoIndex % sellerKeys.length], {
+            name: shoePhotos[photoIndex].name,
+            price: sale ? 3600 + (photoIndex % 5) * 500 : 0,
+            description: `${condition} condition.`,
+            listingType: sale ? 'sale' : 'trade',
+            status: 'approved',
+            condition,
+            offerNote: sale ? '' : 'Open to a Jordan in a close size.',
+            sizes: [{ label: `US ${7 + (photoIndex % 5)}`, stock: 1 }]
+        }))
+    }
+    if (extraHands.length) {
+        const moreOffers = await Product.create(extraHands)
+        createdOffers.push(...moreOffers)
+    }
 
     console.log('Sample data added.')
     console.log(`${createdProducts.length} products, ${createdOffers.length} offers, ${createdUsers.length} users, ${deliveredOrders.length + 5} orders, ${reviewLines.length} reviews.`)

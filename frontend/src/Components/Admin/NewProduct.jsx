@@ -9,6 +9,7 @@ import Sidebar from './SideBar'
 // import axios from 'axios'
 import { toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
+import axios from 'axios'
 import { useDispatch, useSelector } from 'react-redux'
 import { newProduct, clearErrors } from '../../actions/productActions'
 import { NEW_PRODUCT_RESET } from '../../constants/productConstants'
@@ -17,17 +18,20 @@ const productSchema = yup.object({
     name: yup.string().trim().required('Name is required').max(100, 'Name cannot exceed 100 characters'),
     price: yup.number().typeError('Price has to be a number').moreThan(0, 'Price has to be greater than 0').required('Price is required'),
     description: yup.string().trim().required('Description is required'),
-    category: yup.string().oneOf(['Shoes', 'Clothes', 'Accessories']).required('Category is required'),
-    seller: yup.string().trim().required('Seller is required')
+    category: yup.string().oneOf(['Shoes', 'Clothes', 'Accessories', 'sale', 'trade']).required('Category is required')
 })
 
 const NewProduct = () => {
     const dispatch = useDispatch()
     const { loading, error, success } = useSelector(state => state.newProduct)
-    const { register, handleSubmit, formState: { errors } } = useForm({
+    const { register, handleSubmit, watch, formState: { errors } } = useForm({
         resolver: yupResolver(productSchema),
         defaultValues: { category: 'Shoes', price: '' }
     })
+    const category = watch('category')
+    const hand = category === 'sale' || category === 'trade'
+    const [people, setPeople] = useState([])
+    const [sellerName, setSellerName] = useState('')
 
     const [sizes, setSizes] = useState([{ label: 'One size', stock: '1' }]);
     const [images, setImages] = useState([]);
@@ -38,9 +42,11 @@ const NewProduct = () => {
     // const [product, setProduct] = useState({})
 
     const categories = [
-        'Shoes',
-        'Clothes',
-        'Accessories'
+        ['Shoes', 'Shoes'],
+        ['Clothes', 'Clothes'],
+        ['Accessories', 'Accessories'],
+        ['sale', 'For sale'],
+        ['trade', 'For trade']
     ]
 
     let navigate = useNavigate()
@@ -57,14 +63,22 @@ const NewProduct = () => {
             toast.error('Add at least one photo', { position: 'bottom-right' })
             return
         }
+        const selling = values.category === 'sale' || values.category === 'trade'
+        const person = people.find(item => item.name.toLowerCase() === sellerName.trim().toLowerCase())
+        if (selling && !person) {
+            toast.error('Choose a seller from the list', { position: 'bottom-right' })
+            return
+        }
         dispatch(newProduct({
             name: values.name.trim(),
             price: Number(values.price),
             description: values.description.trim(),
-            category: values.category,
+            category: selling ? 'Shoes' : values.category,
+            listingType: selling ? values.category : 'shop',
+            offeredBy: person?._id,
             stock: cleanedSizes.reduce((sum, size) => sum + size.stock, 0),
             sizes: cleanedSizes,
-            seller: values.seller.trim(),
+            seller: selling ? person.name : 'J-Trade',
             images
         }))
     }
@@ -158,6 +172,13 @@ const NewProduct = () => {
 
     }, [error, dispatch, navigate, success])
 
+    useEffect(() => {
+        if (!hand) return
+        axios.get(`${import.meta.env.VITE_API}/admin/users`, { withCredentials: true })
+            .then(({ data }) => setPeople(data.users || []))
+            .catch(() => setPeople([]))
+    }, [hand])
+
     return (
         <>
             <MetaData title={'New Product'} />
@@ -190,10 +211,9 @@ const NewProduct = () => {
                                 <div className="form-group">
                                     <label htmlFor="category_field">Category</label>
                                     <select className="form-control" id="category_field" {...register('category')}>
-                                        {categories.map(category => (
-                                            <option key={category} value={category} >{category}</option>
+                                        {categories.map(([value, label]) => (
+                                            <option key={value} value={value}>{label}</option>
                                         ))}
-
                                     </select>
                                 </div>
                                 <div className="form-group">
@@ -221,11 +241,31 @@ const NewProduct = () => {
                                     <p className="photo-note">{sizes.reduce((sum, size) => sum + (Number(size.stock) || 0), 0)} left in total</p>
                                 </div>
 
-                                <div className="form-group">
-                                    <label htmlFor="seller_field">Seller Name</label>
-                                    <input type="text" id="seller_field" className="form-control" {...register('seller')} />
-                                    {errors.seller && <p className="text-danger mt-2 mb-0">{errors.seller.message}</p>}
-                                </div>
+                                {hand && (
+                                    <div className="form-group">
+                                        <label htmlFor="seller_field">Who is selling</label>
+                                        <input
+                                            type="text"
+                                            id="seller_field"
+                                            className="form-control"
+                                            placeholder="Type a name from the list"
+                                            value={sellerName}
+                                            onChange={(event) => setSellerName(event.target.value)}
+                                        />
+                                        {sellerName.trim() && (
+                                        <ul className="seller-list">
+                                            {people.filter(person => person.name.toLowerCase().includes(sellerName.trim().toLowerCase())).slice(0, 6).map(person => (
+                                                <li key={person._id}>
+                                                    <button type="button" onClick={() => setSellerName(person.name)}>{person.name}</button>
+                                                </li>
+                                            ))}
+                                            {sellerName.trim() && !people.some(person => person.name.toLowerCase().includes(sellerName.trim().toLowerCase())) && (
+                                                <li className="photo-note">No one with that name</li>
+                                            )}
+                                        </ul>
+                                        )}
+                                    </div>
+                                )}
 
                                 <div className='form-group'>
                                     <label htmlFor="product_photos">Photos</label>

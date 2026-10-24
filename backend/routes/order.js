@@ -5,6 +5,8 @@ const { newOrder,
 	myOrders,
 	getSingleOrder,
 	deleteOrder,
+	deleteOrders,
+	restoreOrders,
 	allOrders,
 	updateOrder,
 	totalOrders,
@@ -22,6 +24,8 @@ router.get('/order/:id', isAuthenticatedUser, getSingleOrder);
 router.get('/admin/orders/', isAuthenticatedUser, authorizeRoles('admin'), allOrders);
 // router.route('/admin/order/:id').delete(isAuthenticatedUser, deleteOrder);
 router.route('/admin/order/:id').put(isAuthenticatedUser, authorizeRoles('admin'), updateOrder).delete(isAuthenticatedUser, authorizeRoles('admin'), deleteOrder);
+router.delete('/admin/orders', isAuthenticatedUser, authorizeRoles('admin'), deleteOrders)
+router.put('/admin/orders/restore', isAuthenticatedUser, authorizeRoles('admin'), restoreOrders)
 router.get('/admin/total-orders', totalOrders);
 router.get('/admin/total-sales', totalSales);
 router.get('/admin/customer-sales', customerSales);

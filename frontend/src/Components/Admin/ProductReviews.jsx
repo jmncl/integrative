@@ -2,20 +2,25 @@ import { useEffect, useState } from 'react'
 import MetaData from '../Layout/MetaData'
 import Loader from '../Layout/Loader'
 import Sidebar from './SideBar'
-import Swal from 'sweetalert2'
 import axios from 'axios'
 import { toast } from 'react-toastify'
-import { DataGrid } from '@mui/x-data-grid'
+import ScrollTable from './ScrollTable'
 import TableFace from './TableFace'
+import TableBar from './TableBar'
+import RowAction from './RowAction'
+import { askConfirm } from '../../Utils/confirm'
 
 const ProductReviews = () => {
     const [reviews, setReviews] = useState([])
     const [loading, setLoading] = useState(true)
     const [query, setQuery] = useState('')
+    const [selection, setSelection] = useState({ type: 'include', ids: new Set() })
+    const [showDeleted, setShowDeleted] = useState(false)
 
-    const loadReviews = async () => {
+    const loadReviews = async (deleted = showDeleted) => {
+        setLoading(true)
         try {
-            const { data } = await axios.get(`${import.meta.env.VITE_API}/admin/reviews`, { withCredentials: true })
+            const { data } = await axios.get(`${import.meta.env.VITE_API}/admin/reviews${deleted ? '?deleted=1' : ''}`, { withCredentials: true })
             setReviews(data.reviews || [])
         } catch (error) {
             toast.error(error.response?.data?.message || 'Could not load reviews', { position: 'bottom-right' })
@@ -24,30 +29,8 @@ const ProductReviews = () => {
     }
 
     useEffect(() => {
-        loadReviews()
-    }, [])
-
-    const deleteReview = async (id, productId) => {
-        try {
-            await axios.delete(`${import.meta.env.VITE_API}/reviews?id=${id}&productId=${productId}`, { withCredentials: true })
-            setReviews(current => current.filter(review => String(review._id) !== String(id)))
-            toast.success('Review deleted', { position: 'bottom-right' })
-        } catch (error) {
-            toast.error(error.response?.data?.message || 'Could not delete the review', { position: 'bottom-right' })
-        }
-    }
-
-    const deleteReviewHandler = (id, productId) => {
-        Swal.fire({
-            title: 'Delete Review',
-            icon: 'info',
-            text: 'Do you want to delete this review',
-            confirmButtonText: 'Delete',
-            showCancelButton: true
-        }).then((result) => {
-            if (result.isConfirmed) deleteReview(id, productId)
-        })
-    }
+        loadReviews(showDeleted)
+    }, [showDeleted])
 
     const needle = query.trim().toLowerCase()
     const shown = needle
@@ -82,18 +65,60 @@ const ProductReviews = () => {
         { field: 'rating', headerName: 'Rating', width: 110, sortable: false },
         { field: 'comment', headerName: 'Comment', flex: 1.4, minWidth: 220, sortable: false },
         {
-            field: 'actions',
-            headerName: 'Actions',
-            width: 110,
+            field: 'view',
+            headerName: '',
+            width: 70,
             sortable: false,
             filterable: false,
             renderCell: (params) => (
-                <button className="btn btn-danger py-1 px-2" type="button" onClick={() => deleteReviewHandler(params.row.id, params.row.product)}>
-                    <i className="fa fa-trash"></i>
-                </button>
+                <RowAction
+                    showDeleted={showDeleted}
+                    to={`/product/${params.row.product}?review=${params.row.id}`}
+                    onRestore={() => restoreItems([{ id: params.row.id, productId: params.row.product }])}
+                />
             )
         }
     ]
+
+    const selectedIds = selection?.type === 'exclude'
+        ? shown.map(review => review._id).filter(id => !selection.ids.has(id))
+        : [...(selection?.ids || [])]
+
+    const deleteSelected = async () => {
+        const ok = await askConfirm('Delete selected reviews?', 'They will be hidden. The product rating uses the reviews that are still visible.')
+        if (!ok) return
+        const items = shown
+            .filter(review => selectedIds.map(String).includes(String(review._id)))
+            .map(review => ({ id: review._id, productId: review.product }))
+        if (!items.length) return
+        try {
+            await axios.delete(`${import.meta.env.VITE_API}/admin/reviews`, {
+                data: { items },
+                withCredentials: true
+            })
+            const gone = new Set(items.map(item => String(item.id)))
+            setReviews(current => current.filter(review => !gone.has(String(review._id))))
+            setSelection({ type: 'include', ids: new Set() })
+            toast.success('Reviews deleted', { position: 'bottom-right' })
+        } catch (error) {
+            toast.error(error.response?.data?.message || 'Could not delete the reviews', { position: 'bottom-right' })
+        }
+    }
+
+    const restoreItems = async (items) => {
+        if (!items.length) return
+        const ok = await askConfirm(items.length > 1 ? 'Restore selected reviews?' : 'Restore this review?', 'They will count toward the product rating again.')
+        if (!ok) return
+        try {
+            await axios.put(`${import.meta.env.VITE_API}/admin/reviews/restore`, { items }, { withCredentials: true })
+            const gone = new Set(items.map(item => String(item.id)))
+            setReviews(current => current.filter(review => !gone.has(String(review._id))))
+            setSelection({ type: 'include', ids: new Set() })
+            toast.success(items.length > 1 ? 'Reviews restored' : 'Review restored', { position: 'bottom-right' })
+        } catch (error) {
+            toast.error(error.response?.data?.message || 'Could not restore the reviews', { position: 'bottom-right' })
+        }
+    }
 
     const rows = shown.map(review => ({
         id: review._id,
@@ -115,28 +140,37 @@ const ProductReviews = () => {
                 <div className="admin-main">
                     <div className="page-head">
                         <h1 className="page-title">Reviews</h1>
-                        <input
-                            className="form-control review-search"
-                            type="text"
+                        <TableBar
+                            query={query}
+                            onQuery={setQuery}
                             placeholder="Search product or user"
-                            value={query}
-                            onChange={(event) => setQuery(event.target.value)}
+                            showDeleted={showDeleted}
+                            onToggleDeleted={() => { setSelection({ type: 'include', ids: new Set() }); setShowDeleted(value => !value) }}
                         />
                     </div>
+                    {selectedIds.length > 0 && (
+                        <div className="delete-row">
+                            {showDeleted
+                                ? <button type="button" className="catalog-edit" onClick={() => restoreItems(shown.filter(review => selectedIds.map(String).includes(String(review._id))).map(review => ({ id: review._id, productId: review.product })))}>Restore selected</button>
+                                : <button type="button" className="bulk-delete" onClick={deleteSelected}>Delete selected</button>}
+                        </div>
+                    )}
                     {loading ? <Loader /> : rows.length ? (
                         <div style={{ width: '100%' }}>
-                            <DataGrid
+                            <ScrollTable
                                 rows={rows}
                                 columns={columns}
-                                autoHeight
+                                resetKey={`${query}-${showDeleted}`}
                                 rowHeight={72}
-                                pageSizeOptions={[10, 25, 50]}
                                 sortingOrder={['desc', 'asc']}
                                 initialState={{
-                                    pagination: { paginationModel: { pageSize: 10 } },
                                     sorting: { sortModel: [{ field: 'id', sort: 'desc' }] }
                                 }}
+                                checkboxSelection
+                                disableColumnMenu
                                 disableRowSelectionOnClick
+                                rowSelectionModel={selection}
+                                onRowSelectionModelChange={(model) => setSelection(model)}
                                 getRowId={(row) => row.id}
                             />
                         </div>

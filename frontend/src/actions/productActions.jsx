@@ -37,7 +37,7 @@ import {
     CLEAR_ERRORS
 } from '../constants/productConstants';
 
-export const getProducts = (currentPage = 1, keyword = '', price, category = '', rating = 0, reviews = '', append = false) => async (dispatch) => {
+export const getProducts = (currentPage = 1, keyword = '', price, category = '', rating = 0, reviews = '', append = false, listing = '') => async (dispatch) => {
     try {
         dispatch({
             type: ALL_PRODUCTS_REQUEST,
@@ -51,6 +51,7 @@ export const getProducts = (currentPage = 1, keyword = '', price, category = '',
             'price[gte]': price[0]
         })
         if (category) params.set('category', category)
+        if (listing) params.set('listing', listing)
         if (rating) params.set('ratings[gte]', rating)
         if (reviews === 'yes') params.set('numOfReviews[gte]', 1)
         if (reviews === 'no') params.set('numOfReviews[lte]', 0)
@@ -107,10 +108,10 @@ export const newProduct = (productData) => async (dispatch) => {
     }
 }
 
-export const getAdminProducts = () => async (dispatch) => {
+export const getAdminProducts = (deleted = false) => async (dispatch) => {
     try {
         dispatch({ type: ADMIN_PRODUCTS_REQUEST })
-        const { data } = await axios.get(`${import.meta.env.VITE_API}/admin/products`, {
+        const { data } = await axios.get(`${import.meta.env.VITE_API}/admin/products${deleted ? '?deleted=1' : ''}`, {
             //AxiosRequestConfig parameter
             withCredentials: true //correct
         })
@@ -225,10 +226,10 @@ export const newOffer = (offerData) => async (dispatch) => {
     }
 }
 
-export const getMyOffers = () => async (dispatch) => {
+export const getMyOffers = (deleted = false) => async (dispatch) => {
     try {
         dispatch({ type: MY_OFFERS_REQUEST })
-        const { data } = await axios.get(`${import.meta.env.VITE_API}/offers/me`, {
+        const { data } = await axios.get(`${import.meta.env.VITE_API}/offers/me${deleted ? '?deleted=1' : ''}`, {
             withCredentials: true
         })
         dispatch({
@@ -243,10 +244,10 @@ export const getMyOffers = () => async (dispatch) => {
     }
 }
 
-export const getAdminOffers = () => async (dispatch) => {
+export const getAdminOffers = (deleted = false) => async (dispatch) => {
     try {
         dispatch({ type: ADMIN_OFFERS_REQUEST })
-        const { data } = await axios.get(`${import.meta.env.VITE_API}/admin/offers`, {
+        const { data } = await axios.get(`${import.meta.env.VITE_API}/admin/offers${deleted ? '?deleted=1' : ''}`, {
             withCredentials: true
         })
         dispatch({

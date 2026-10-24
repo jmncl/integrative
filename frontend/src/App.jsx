@@ -59,7 +59,7 @@ function App() {
         <main className="site-main">
         <Routes>
           <Route path="/" element={<CustomerRoute><Home /></CustomerRoute>} />
-          <Route path="/product/:id" element={<CustomerRoute><ProductDetails /></CustomerRoute>} />
+          <Route path="/product/:id" element={<ProductDetails />} />
           <Route path="/search/:keyword" element={<CustomerRoute><Home /></CustomerRoute>} exact="true" />
           <Route path="/login" element={<Login />} exact="true" />
           <Route path="/register" element={<CustomerRoute><Register /></CustomerRoute>} />

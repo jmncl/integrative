@@ -127,6 +127,10 @@ const productSchema = new mongoose.Schema({
             comment: {
                 type: String,
                 required: true
+            },
+            deletedAt: {
+                type: Date,
+                default: null
             }
         }
     ],
@@ -141,6 +145,10 @@ const productSchema = new mongoose.Schema({
     createdAt: {
         type: Date,
         default: Date.now
+    },
+    deletedAt: {
+        type: Date,
+        default: null
     }
 })
 

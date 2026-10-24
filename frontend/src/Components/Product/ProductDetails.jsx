@@ -1,12 +1,14 @@
 import { useState, useEffect } from 'react'
 import { createPortal } from 'react-dom'
-import { useNavigate, useParams } from 'react-router-dom'
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
+import axios from 'axios'
 import { toast } from 'react-toastify'
+import { askConfirm } from '../../Utils/confirm'
 import MetaData from '../Layout/MetaData'
 import Loader from '../Layout/Loader'
 import { useDispatch, useSelector } from 'react-redux'
-import { getProductDetails, newReview } from '../../actions/productActions'
-import { NEW_REVIEW_RESET, CLEAR_ERRORS } from '../../constants/productConstants'
+import { getProductDetails, newReview, reviewOffer, clearErrors } from '../../actions/productActions'
+import { NEW_REVIEW_RESET, REVIEW_OFFER_RESET, CLEAR_ERRORS } from '../../constants/productConstants'
 import { addItemToCart } from '../../actions/cartActions'
 import { peso } from '../../Utils/money'
 import { productCode } from '../../Utils/codes'
@@ -14,6 +16,7 @@ import { productCode } from '../../Utils/codes'
 const ProductDetails = () => {
     const { product, canReview, myReview, loading: productLoading, error: productError } = useSelector(state => state.productDetails);
     const { success: reviewDone, error: reviewError } = useSelector(state => state.newReview)
+    const { success: offerDone, error: offerError, loading: reviewing } = useSelector(state => state.offerReview)
     const { user, isAuthenticated, loading } = useSelector(state => state.auth)
     const [quantity, setQuantity] = useState(1)
     const [size, setSize] = useState('')
@@ -25,7 +28,12 @@ const ProductDetails = () => {
     const [reviewComment, setReviewComment] = useState('')
     const [moreReviews, setMoreReviews] = useState(false)
     const [starFilter, setStarFilter] = useState(5)
+    const [editingDescription, setEditingDescription] = useState(false)
+    const [descriptionDraft, setDescriptionDraft] = useState('')
+    const [savingDescription, setSavingDescription] = useState(false)
     const { id } = useParams()
+    const [searchParams] = useSearchParams()
+    const focusReview = searchParams.get('review') || ''
     const dispatch = useDispatch()
     const navigate = useNavigate()
     const loggedIn = Boolean(isAuthenticated && user?.name)
@@ -43,7 +51,9 @@ const ProductDetails = () => {
     const status = product.status || 'approved'
     const forTrade = listingType === 'trade'
     const forSale = listingType === 'sale'
-    const canBuy = Boolean(product._id) && status === 'approved' && !forTrade
+    const isAdmin = user?.role === 'admin'
+    const secondHand = forSale || forTrade
+    const canBuy = Boolean(product._id) && status === 'approved' && !forTrade && !isAdmin
 
     const increaseQty = () => {
         if (!sizeStock || quantity >= sizeStock) return;
@@ -95,7 +105,26 @@ const ProductDetails = () => {
         setSheet(false)
         setMoreReviews(false)
         setStarFilter(5)
+        setEditingDescription(false)
     }, [dispatch, id]);
+
+    useEffect(() => {
+        if (!focusReview || !product?.reviews?.length) return
+        const match = product.reviews.find(item => String(item._id) === String(focusReview))
+        if (!match) return
+        const preview = product.reviews.filter(item => item.rating === 5).slice(0, 3)
+        const alreadyShown = preview.some(item => String(item._id) === String(focusReview))
+        if (!alreadyShown) {
+            setMoreReviews(true)
+            setStarFilter(match.rating)
+        }
+    }, [focusReview, product])
+
+    useEffect(() => {
+        if (!focusReview) return
+        const node = document.getElementById(`review-${focusReview}`)
+        if (node) node.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    }, [focusReview, product, moreReviews, starFilter])
 
     useEffect(() => {
         if (myReview) {
@@ -119,7 +148,67 @@ const ProductDetails = () => {
         }
     }, [reviewDone, reviewError, dispatch, id, myReview])
 
+    useEffect(() => {
+        if (offerError) {
+            toast.error(offerError, { position: 'bottom-right' })
+            dispatch(clearErrors())
+        }
+        if (offerDone) {
+            toast.success('Offer updated', { position: 'bottom-right' })
+            dispatch({ type: REVIEW_OFFER_RESET })
+            dispatch(getProductDetails(id))
+        }
+    }, [offerDone, offerError, dispatch, id])
+
     const ready = product && String(product._id) === String(id)
+
+    const saveDescription = async () => {
+        const text = descriptionDraft.trim()
+        if (!text) {
+            toast.error('Description is required', { position: 'bottom-right' })
+            return
+        }
+        setSavingDescription(true)
+        try {
+            const body = new FormData()
+            body.append('description', text)
+            await axios.put(`${import.meta.env.VITE_API}/admin/product/${id}`, body, { withCredentials: true })
+            setEditingDescription(false)
+            dispatch(getProductDetails(id))
+            toast.success('Description updated', { position: 'bottom-right' })
+        } catch (error) {
+            toast.error(error.response?.data?.message || 'Could not update the description', { position: 'bottom-right' })
+        } finally {
+            setSavingDescription(false)
+        }
+    }
+
+    const removeReview = async (review) => {
+        const ok = await askConfirm('Delete this review?', 'It will be hidden. The product rating uses the reviews that are still visible.')
+        if (!ok) return
+        try {
+            await axios.delete(`${import.meta.env.VITE_API}/reviews`, {
+                params: { id: review._id, productId: product._id },
+                withCredentials: true
+            })
+            toast.success('Review deleted', { position: 'bottom-right' })
+            dispatch(getProductDetails(id))
+        } catch (error) {
+            toast.error(error.response?.data?.message || 'Could not delete that review', { position: 'bottom-right' })
+        }
+    }
+
+    const removeThis = async () => {
+        const ok = await askConfirm('Delete this product?', 'It will be hidden from new sales. Older orders stay as they are.')
+        if (!ok) return
+        try {
+            await axios.delete(`${import.meta.env.VITE_API}/admin/product/${id}`, { withCredentials: true })
+            toast.success('Product deleted', { position: 'bottom-right' })
+            navigate('/admin/products')
+        } catch (error) {
+            toast.error(error.response?.data?.message || 'Could not delete the product', { position: 'bottom-right' })
+        }
+    }
 
     const submitReview = (event) => {
         event.preventDefault()
@@ -143,6 +232,10 @@ const ProductDetails = () => {
     return (
         <>
             <MetaData title={product.name} />
+            <button type="button" className="back-btn" onClick={() => navigate(-1)}>
+                <span className="back-btn-icon" aria-hidden="true"><i className="fa fa-angle-left"></i></span>
+                Back
+            </button>
             <div className="row d-flex justify-content-around align-items-start">
                 <div className="col-12 col-lg-5" id="product_image">
                     {product.images && product.images[photo] && (
@@ -174,6 +267,7 @@ const ProductDetails = () => {
                         <p id="product_price">{peso(product.price)}</p>
                     )}
                     {forSale && <p className="card-category">For sale</p>}
+                    {secondHand && <p className="owner-line">Owner <strong>{product.seller || 'Unknown'}</strong></p>}
                     {product.category && <p className="card-category">{product.category}</p>}
                     {product.condition && <p className="photo-note">Condition: {product.condition}</p>}
                     {forTrade && status === 'approved' && (
@@ -184,6 +278,19 @@ const ProductDetails = () => {
                             <p>The seller wants a trade, not a paid checkout.</p>
                         </div>
                     )}
+                    {isAdmin && status !== 'pending' && (
+                        <div className="catalog-admin">
+                            <button type="button" className="catalog-edit" onClick={() => navigate(`/admin/product/${id}`)}>Edit</button>
+                            {!product.deletedAt && <button type="button" className="bulk-delete" onClick={removeThis}>Delete</button>}
+                            {product.deletedAt && <p className="photo-note">Hidden from the shop. Older orders still keep this sale.</p>}
+                        </div>
+                    )}
+                    {isAdmin && secondHand && status === 'pending' && (
+                        <div className="catalog-admin">
+                            <button type="button" className="add-product" disabled={reviewing} onClick={() => dispatch(reviewOffer(id, 'approved'))}>Approve</button>
+                            <button type="button" className="bulk-delete" disabled={reviewing} onClick={() => dispatch(reviewOffer(id, 'rejected'))}>Reject</button>
+                        </div>
+                    )}
                     {canBuy && (
                         <>
                             <button type="button" id="cart_btn" className="btn" onClick={openSheet}>{added ? 'Added to cart' : 'Add to Cart'}</button>
@@ -191,15 +298,43 @@ const ProductDetails = () => {
                         </>
                     )}
                     <hr />
-                    <h4 className="mt-4">Description</h4>
-                    <p>{product.description}</p>
+                    <div className="heading-row">
+                        <h4>Description</h4>
+                        {isAdmin && status !== 'pending' && !editingDescription && (
+                            <button
+                                type="button"
+                                className="pen-btn"
+                                aria-label="Edit description"
+                                onClick={() => { setDescriptionDraft(product.description || ''); setEditingDescription(true) }}
+                            >
+                                <i className="fa fa-pencil"></i>
+                            </button>
+                        )}
+                    </div>
+                    {editingDescription ? (
+                        <div className="inline-note">
+                            <textarea
+                                aria-label="Description"
+                                value={descriptionDraft}
+                                onChange={(event) => setDescriptionDraft(event.target.value)}
+                            />
+                            <div className="inline-note-actions">
+                                <button type="button" className="catalog-edit" disabled={savingDescription} onClick={saveDescription}>Save</button>
+                                <button type="button" className="bulk-delete" onClick={() => setEditingDescription(false)}>Cancel</button>
+                            </div>
+                        </div>
+                    ) : (
+                        <p>{product.description}</p>
+                    )}
                 </div>
             </div>
-            {product._id && (
+            {product._id && !secondHand && (
                 <section className="review-box">
-                    <h3>Reviews</h3>
+                    <div className="heading-row">
+                        <h3>Reviews</h3>
+                    </div>
                     <p className="card-stars">{'★★★★★'.slice(0, Math.round(product.ratings || 0))}{'☆☆☆☆☆'.slice(0, 5 - Math.round(product.ratings || 0))} <span>{product.numOfReviews || 0} reviews</span></p>
-                    {canReview ? (
+                    {isAdmin ? null : canReview ? (
                         <form onSubmit={submitReview} className="review-form">
                             <label htmlFor="review_rating">Your rating</label>
                             <select id="review_rating" value={reviewRating} onChange={(event) => setReviewRating(Number(event.target.value))}>
@@ -218,10 +353,23 @@ const ProductDetails = () => {
                         const shown = moreReviews ? allReviews.filter(review => review.rating === starFilter) : preview
                         if (!allReviews.length) return <p className="empty-note">No reviews yet.</p>
                         const cards = (list) => list.map(review => (
-                            <article key={review._id} className="review-card">
-                                <p className="card-stars">{'★'.repeat(review.rating)}{'☆'.repeat(5 - review.rating)}</p>
-                                <p className="review_user">{review.name}</p>
-                                <p>{review.comment}</p>
+                            <article
+                                key={review._id}
+                                id={`review-${review._id}`}
+                                className={String(review._id) === String(focusReview) ? 'review-card review-hit' : 'review-card'}
+                            >
+                                <div className="review-line">
+                                    <div>
+                                        <p className="card-stars">{'★'.repeat(review.rating)}{'☆'.repeat(5 - review.rating)}</p>
+                                        <p className="review_user">{review.name}</p>
+                                        <p>{review.comment}</p>
+                                    </div>
+                                    {isAdmin && (
+                                        <button type="button" className="trash-btn" aria-label="Delete review" onClick={() => removeReview(review)}>
+                                            <i className="fa fa-trash"></i>
+                                        </button>
+                                    )}
+                                </div>
                             </article>
                         ))
                         return (
