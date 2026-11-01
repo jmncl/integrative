@@ -1,18 +1,25 @@
-import React, { useState } from 'react'
+import React, { useEffect, useState } from 'react'
 import { useNavigate } from "react-router-dom";
 import { countries } from 'countries-list'
 import MetaData from '../Layout/MetaData'
 import Loader from '../Layout/Loader'
 import CheckoutSteps from './CheckoutSteps'
 import { useDispatch, useSelector } from 'react-redux'
-import { saveShippingInfo } from '../../actions/cartActions'
+import { saveShippingInfo, loadUserCart } from '../../actions/cartActions'
 
 const Shipping = () => {
+    const dispatch = useDispatch()
     const { shippingInfo, cartOwnerId } = useSelector(state => state.cart)
-    const { user } = useSelector(state => state.auth)
+    const { user, loading } = useSelector(state => state.auth)
     const ready = user?._id && String(cartOwnerId) === String(user._id)
 
-    if (!ready) {
+    useEffect(() => {
+        if (!user?._id) return
+        if (String(cartOwnerId) === String(user._id)) return
+        dispatch(loadUserCart(user._id))
+    }, [dispatch, user?._id, cartOwnerId])
+
+    if (loading || !user?._id || !ready) {
         return <Loader />
     }
 

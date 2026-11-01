@@ -48,6 +48,12 @@ const ListOrders = () => {
 
     const columns = [
         {
+            field: 'created',
+            headerName: 'Placed',
+            width: 130,
+            valueFormatter: (value) => value ? new Date(value).toLocaleDateString() : ''
+        },
+        {
             field: 'code',
             headerName: 'Order',
             flex: 1,
@@ -94,6 +100,7 @@ const ListOrders = () => {
     const needle = query.trim().toLowerCase()
     const rows = (orders || []).map(order => ({
         id: order._id,
+        created: new Date(order.createdAt || 0).getTime(),
         code: orderCode(order),
         numOfItems: order.orderItems.length,
         amount: peso(order.totalPrice),
@@ -116,6 +123,10 @@ const ListOrders = () => {
                         columns={columns}
                         resetKey={query}
                         rowHeight={72}
+                        sortingOrder={['desc', 'asc']}
+                        initialState={{
+                            sorting: { sortModel: [{ field: 'created', sort: 'desc' }] }
+                        }}
                         disableColumnMenu
                         disableRowSelectionOnClick
                         getRowId={(row) => row.id}

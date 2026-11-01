@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { Link } from 'react-router-dom'
 import RowAction from './RowAction'
 import { toast } from 'react-toastify'
 import axios from 'axios'
@@ -10,12 +11,14 @@ import TableFace from './TableFace'
 import TableBar from './TableBar'
 import { askConfirm } from '../../Utils/confirm'
 import { useDispatch, useSelector } from 'react-redux'
-import { getAdminOffers, clearErrors } from '../../actions/productActions'
+import { getAdminOffers, reviewOffer, clearErrors } from '../../actions/productActions'
+import { REVIEW_OFFER_RESET } from '../../constants/productConstants'
 import { peso } from '../../Utils/money'
 
 const OfferQueue = () => {
     const dispatch = useDispatch()
     const { loading, offers, error } = useSelector(state => state.adminOffers)
+    const { success: offerDone, error: offerError, loading: reviewing } = useSelector(state => state.offerReview)
     const [selection, setSelection] = useState({ type: 'include', ids: new Set() })
     const [query, setQuery] = useState('')
     const [showDeleted, setShowDeleted] = useState(false)
@@ -30,6 +33,18 @@ const OfferQueue = () => {
             dispatch(clearErrors())
         }
     }, [error, dispatch])
+
+    useEffect(() => {
+        if (offerError) {
+            toast.error(offerError, { position: 'bottom-right' })
+            dispatch(clearErrors())
+        }
+        if (offerDone) {
+            toast.success('Offer updated', { position: 'bottom-right' })
+            dispatch({ type: REVIEW_OFFER_RESET })
+            dispatch(getAdminOffers(showDeleted))
+        }
+    }, [offerDone, offerError, dispatch, showDeleted])
 
     const selectedIds = selection?.type === 'exclude'
         ? (offers || []).map(offer => offer._id).filter(id => !selection.ids.has(id))
@@ -64,6 +79,15 @@ const OfferQueue = () => {
         } catch (restoreError) {
             toast.error(restoreError.response?.data?.message || 'Could not restore those offers', { position: 'bottom-right' })
         }
+    }
+
+    const decide = async (id, status) => {
+        const ok = await askConfirm(
+            status === 'approved' ? 'Approve this offer?' : 'Reject this offer?',
+            status === 'approved' ? 'It will show in Second Hand.' : 'It will stay hidden from the shop.'
+        )
+        if (!ok) return
+        dispatch(reviewOffer(id, status))
     }
 
     const needle = query.trim().toLowerCase()
@@ -110,13 +134,23 @@ const OfferQueue = () => {
         },
         { field: 'from', headerName: 'From', flex: 1, minWidth: 140, sortable: false },
         {
-            field: 'view',
+            field: 'actions',
             headerName: '',
-            width: 70,
+            width: showDeleted ? 70 : 210,
             sortable: false,
             filterable: false,
             renderCell: (params) => (
-                <RowAction showDeleted={showDeleted} to={`/product/${params.row.id}`} onRestore={() => restoreIds([params.row.id])} />
+                showDeleted ? (
+                    <RowAction showDeleted to={`/product/${params.row.id}`} onRestore={() => restoreIds([params.row.id])} />
+                ) : (
+                    <div className="queue-actions">
+                        <button type="button" className="offer-approve" disabled={reviewing} onClick={() => decide(params.row.id, 'approved')}>Approve</button>
+                        <button type="button" className="offer-reject" disabled={reviewing} onClick={() => decide(params.row.id, 'rejected')}>Reject</button>
+                        <Link to={`/product/${params.row.id}`} className="table-view" aria-label="View">
+                            <i className="fa fa-eye"></i>
+                        </Link>
+                    </div>
+                )
             )
         }
     ]

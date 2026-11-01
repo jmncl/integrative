@@ -26,6 +26,7 @@ const UpdateProduct = () => {
     const [category, setCategory] = useState('Shoes');
     const [stock, setStock] = useState(0);
     const [seller, setSeller] = useState('');
+    const [offerNote, setOfferNote] = useState('');
     const [sizes, setSizes] = useState([{ label: 'One size', stock: '1' }]);
     const [images, setImages] = useState([]);
     const [oldImages, setOldImages] = useState([]);
@@ -95,6 +96,7 @@ const UpdateProduct = () => {
             setCategory(hand ? product.listingType : product.category);
             setSeller(product.seller || '');
             setStock(product.stock)
+            setOfferNote(product.offerNote || '');
             setSizes(product.sizes?.length ? product.sizes.map(size => ({ label: size.label, stock: size.stock })) : [{ label: 'One size', stock: product.stock }])
             setOldImages(product.images || [])
         }
@@ -129,7 +131,7 @@ const UpdateProduct = () => {
         const cleanedSizes = sizes
             .map(size => ({ label: String(size.label || '').trim(), stock: Number(size.stock) }))
             .filter(size => size.label)
-        const isTrade = product.listingType === 'trade'
+        const isTrade = category === 'trade'
         try {
             await yup.object({
                 name: yup.string().trim().required('Name is required'),
@@ -143,8 +145,7 @@ const UpdateProduct = () => {
             return
         }
         if (!Number.isFinite(priceNumber) || priceNumber < 0 || (!isTrade && priceNumber <= 0)) {
-            toast.error('Price has to be a number, like 1596', { position: 'bottom-right' })
-            return
+            toast.error(isTrade ? 'Price cannot be negative' : 'Price has to be a number, like 1596', { position: 'bottom-right' })
         }
         if (!cleanedSizes.length || cleanedSizes.some(size => !Number.isFinite(size.stock) || size.stock < 0)) {
             toast.error('Each size needs a name and how many are left', { position: 'bottom-right' })
@@ -170,6 +171,7 @@ const UpdateProduct = () => {
             listingType: selling ? category : 'shop',
             offeredBy: person?._id,
             stock: cleanedSizes.reduce((sum, size) => sum + size.stock, 0),
+            offerNote: isTrade ? offerNote.trim() : '',
             sizes: cleanedSizes,
             seller: seller.trim(),
             images: [...oldImages, ...images]
@@ -239,9 +241,10 @@ const UpdateProduct = () => {
                                         id="price_field"
                                         className="form-control"
                                         value={price}
-                                        min="1"
+                                        min={forTrade ? '0' : '1'}
                                         onChange={(e) => setPrice(e.target.value)}
                                     />
+                                    {forTrade && <p className="photo-note">Trade can use 0 if there is no cash amount.</p>}
                                 </div>
                                 <div className="form-group">
                                     <label htmlFor="description_field">Description</label>
@@ -304,9 +307,22 @@ const UpdateProduct = () => {
                                         )}
                                     </div>
                                 )}
-                                <div className='form-group'>
+                                {forTrade && (
+                                    <div className="form-group">
+                                        <label htmlFor="offer_note_field">Trade note</label>
+                                        <textarea
+                                            id="offer_note_field"
+                                            className="form-control"
+                                            rows="3"
+                                            placeholder="What they want in return"
+                                            value={offerNote}
+                                            onChange={(e) => setOfferNote(e.target.value)}
+                                        />
+                                    </div>
+                                )}
+                                <div className="form-group">
                                     <label htmlFor="product_photos">Photos</label>
-                                    <input id="product_photos" type='file' name='images' accept='image/*' onChange={onChange} multiple />
+                                    <input id="product_photos" type="file" name="images" accept="image/*" onChange={onChange} multiple />
                                     <p className="photo-note">You can add more than one photo. Pick them together, or choose again to add another. Up to 6.</p>
                                     <div className="photo-row">
                                         {oldImages && oldImages.map((img, index) => (

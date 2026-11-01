@@ -16,9 +16,14 @@ import { NEW_PRODUCT_RESET } from '../../constants/productConstants'
 
 const productSchema = yup.object({
     name: yup.string().trim().required('Name is required').max(100, 'Name cannot exceed 100 characters'),
-    price: yup.number().typeError('Price has to be a number').moreThan(0, 'Price has to be greater than 0').required('Price is required'),
+    price: yup.number().typeError('Price has to be a number').min(0, 'Price cannot be negative').required('Price is required')
+        .when('category', {
+            is: (value) => value !== 'trade',
+            then: (schema) => schema.moreThan(0, 'Price has to be greater than 0')
+        }),
     description: yup.string().trim().required('Description is required'),
-    category: yup.string().oneOf(['Shoes', 'Clothes', 'Accessories', 'sale', 'trade']).required('Category is required')
+    category: yup.string().oneOf(['Shoes', 'Clothes', 'Accessories', 'sale', 'trade']).required('Category is required'),
+    offerNote: yup.string().trim()
 })
 
 const NewProduct = () => {
@@ -26,10 +31,11 @@ const NewProduct = () => {
     const { loading, error, success } = useSelector(state => state.newProduct)
     const { register, handleSubmit, watch, formState: { errors } } = useForm({
         resolver: yupResolver(productSchema),
-        defaultValues: { category: 'Shoes', price: '' }
+        defaultValues: { category: 'Shoes', price: '', offerNote: '' }
     })
     const category = watch('category')
     const hand = category === 'sale' || category === 'trade'
+    const forTrade = category === 'trade'
     const [people, setPeople] = useState([])
     const [sellerName, setSellerName] = useState('')
 
@@ -76,6 +82,7 @@ const NewProduct = () => {
             category: selling ? 'Shoes' : values.category,
             listingType: selling ? values.category : 'shop',
             offeredBy: person?._id,
+            offerNote: values.category === 'trade' ? String(values.offerNote || '').trim() : '',
             stock: cleanedSizes.reduce((sum, size) => sum + size.stock, 0),
             sizes: cleanedSizes,
             seller: selling ? person.name : 'J-Trade',
@@ -198,7 +205,8 @@ const NewProduct = () => {
 
                                 <div className="form-group">
                                     <label htmlFor="price_field">Price (₱)</label>
-                                    <input type="number" id="price_field" className="form-control" min="1" {...register('price')} />
+                                    <input type="number" id="price_field" className="form-control" min={forTrade ? '0' : '1'} {...register('price')} />
+                                    {forTrade && <p className="photo-note">Trade can use 0 if there is no cash amount.</p>}
                                     {errors.price && <p className="text-danger mt-2 mb-0">{errors.price.message}</p>}
                                 </div>
 
@@ -264,6 +272,19 @@ const NewProduct = () => {
                                             )}
                                         </ul>
                                         )}
+                                    </div>
+                                )}
+
+                                {forTrade && (
+                                    <div className="form-group">
+                                        <label htmlFor="offer_note_field">Trade note</label>
+                                        <textarea
+                                            id="offer_note_field"
+                                            className="form-control"
+                                            rows="3"
+                                            placeholder="What they want in return"
+                                            {...register('offerNote')}
+                                        />
                                     </div>
                                 )}
 

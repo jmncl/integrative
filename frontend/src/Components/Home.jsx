@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react'
-import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
+import { useParams, useSearchParams } from 'react-router-dom'
 import MetaData from './Layout/MetaData'
 import Product from './Product/Product'
 import Loader from './Layout/Loader'
@@ -13,7 +13,6 @@ const Home = () => {
     const [page, setPage] = useState(1)
     const categories = ['Shoes', 'Clothes', 'Accessories']
     const { keyword } = useParams()
-    const navigate = useNavigate()
     const dispatch = useDispatch()
     const sentinel = useRef(null)
     const moreLock = useRef(false)
@@ -28,25 +27,29 @@ const Home = () => {
     const filterKey = [keyword || '', category, rating, reviews, priceMin, priceMax, hand].join('|')
     const priceFiltered = priceMin > 1 || priceMax < 25000
     const count = (keyword || category || rating || reviews || priceFiltered || hand) ? filteredProductsCount : productsCount
-    const browseClear = !keyword && !category && !rating && !reviews && !priceFiltered && !hand
+    const browseClear = !category && !hand
 
     const chooseCategory = (value) => {
         const next = new URLSearchParams(searchParams)
+        next.delete('hand')
         if (value) next.set('category', value)
         else next.delete('category')
         setSearchParams(next)
     }
 
-    const chooseHand = (value) => {
+    const chooseHand = () => {
         const next = new URLSearchParams(searchParams)
-        if (value) next.set('hand', value)
-        else next.delete('hand')
+        next.delete('category')
+        next.set('hand', 'second')
         setSearchParams(next)
     }
 
     const showAll = () => {
+        const next = new URLSearchParams(searchParams)
+        next.delete('category')
+        next.delete('hand')
         setPage(1)
-        navigate('/')
+        setSearchParams(next)
     }
 
     useEffect(() => {

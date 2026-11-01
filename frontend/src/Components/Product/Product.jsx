@@ -16,7 +16,9 @@ const Product = ({ product }) => {
                     <h5 className="card-title">
                         <Link to={`/product/${product._id}`}>{product.name}</Link>
                     </h5>
-                    <p className="card-stars">{'★★★★★'.slice(0, Math.round(product.ratings || 0))}{'☆☆☆☆☆'.slice(0, 5 - Math.round(product.ratings || 0))} <span>{product.numOfReviews || 0} reviews</span></p>
+                    {product.listingType !== 'sale' && product.listingType !== 'trade' && (
+                        <p className="card-stars">{'★★★★★'.slice(0, Math.round(product.ratings || 0))}{'☆☆☆☆☆'.slice(0, 5 - Math.round(product.ratings || 0))} <span>{product.numOfReviews || 0} reviews</span></p>
+                    )}
                     <p className="card-text">{product.listingType === 'trade' ? 'For trade' : peso(product.price)}</p>
                     <Link to={`/product/${product._id}`} id="view_btn" className="btn btn-block">View Details</Link>
                 </div>

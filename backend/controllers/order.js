@@ -28,6 +28,24 @@ exports.newOrder = async (req, res, next) => {
                 message: 'That item is not for sale'
             })
         }
+        const qty = Number(item.quantity) || 0
+        if (qty < 1) {
+            return res.status(400).json({ success: false, message: 'Quantity has to be at least 1' })
+        }
+        if (item.size && product.sizes?.length) {
+            const size = product.sizes.find(entry => entry.label === item.size)
+            if (!size || Number(size.stock) < qty) {
+                return res.status(400).json({
+                    success: false,
+                    message: `${product.name} does not have enough left in that size`
+                })
+            }
+        } else if (Number(product.stock) < qty) {
+            return res.status(400).json({
+                success: false,
+                message: `${product.name} does not have enough left`
+            })
+        }
     }
 
     const order = await Order.create({
@@ -42,6 +60,10 @@ exports.newOrder = async (req, res, next) => {
         user: req.user._id
     })
 
+    for (const item of items) {
+        await updateStock(item.product, item.quantity, item.size)
+    }
+
     res.status(200).json({
         success: true,
         order
@@ -49,7 +71,7 @@ exports.newOrder = async (req, res, next) => {
 }
 
 exports.myOrders = async (req, res, next) => {
-    const orders = await Order.find({ user: req.user.id })
+    const orders = await Order.find({ user: req.user.id }).sort({ createdAt: -1, _id: -1 })
     // console.log(req.user)
     res.status(200).json({
         success: true,
@@ -130,9 +152,6 @@ exports.updateOrder = async (req, res, next) => {
         return res.status(400).json({ message: 'Choose an order status' })
     }
     if (status === 'Delivered') {
-        for (const item of order.orderItems) {
-            await updateStock(item.product, item.quantity)
-        }
         order.deliveredAt = Date.now()
     }
 
@@ -166,10 +185,21 @@ exports.updateOrder = async (req, res, next) => {
     })
 }
 
-async function updateStock(id, quantity) {
-    const product = await Product.findById(id);
-    product.stock = product.stock - quantity;
-
+async function updateStock(id, quantity, sizeLabel) {
+    const product = await Product.findById(id)
+    if (!product) return
+    const qty = Number(quantity) || 0
+    if (qty < 1) return
+    if (sizeLabel && product.sizes?.length) {
+        const size = product.sizes.find(entry => entry.label === sizeLabel)
+        if (size) {
+            size.stock = Math.max(0, Number(size.stock || 0) - qty)
+            product.markModified('sizes')
+        }
+        product.stock = product.sizes.reduce((sum, entry) => sum + Number(entry.stock || 0), 0)
+    } else {
+        product.stock = Math.max(0, Number(product.stock || 0) - qty)
+    }
     await product.save({ validateBeforeSave: false })
 }
 

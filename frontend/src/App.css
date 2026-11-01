@@ -1373,6 +1373,40 @@ button.table-view {
   font-weight: 800;
 }
 
+.owner-card {
+  margin: 16px 0;
+  padding: 16px 18px;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: #faf8f5;
+}
+
+.owner-card-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 8px 0;
+}
+
+.owner-card-photo {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  object-fit: cover;
+  flex: none;
+}
+
+.owner-card-name {
+  margin: 0;
+  font-weight: 800;
+}
+
+.owner-card-mail {
+  margin: 2px 0 0;
+  color: #555;
+  word-break: break-all;
+}
+
 .account-toggle {
   width: 100%;
   height: 46px;
@@ -1834,14 +1868,19 @@ footer p {
 
 .queue-actions {
   display: flex;
-  gap: 8px;
+  align-items: center;
+  gap: 6px;
+  height: 100%;
 }
 
 .offer-approve,
 .offer-reject {
   border-radius: 999px;
   font-weight: 700;
-  padding: 6px 14px;
+  height: 32px;
+  padding: 0 12px;
+  flex: none;
+  white-space: nowrap;
 }
 
 .offer-approve {

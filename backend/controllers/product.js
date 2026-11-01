@@ -89,7 +89,9 @@ exports.newProduct = async (req, res) => {
     try {
         const price = Number(req.body.price)
         const stock = Number(req.body.stock)
-        if (!Number.isFinite(price) || price <= 0) {
+        const hand = req.body.listingType === 'sale' || req.body.listingType === 'trade'
+        const isTrade = req.body.listingType === 'trade'
+        if (!Number.isFinite(price) || price < 0 || (!isTrade && price <= 0)) {
             return res.status(400).json({ success: false, message: 'Price has to be a number' })
         }
         if (!Number.isFinite(stock) || stock < 0) {
@@ -100,7 +102,6 @@ exports.newProduct = async (req, res) => {
             return res.status(400).json({ success: false, message: 'Please add at least one photo' })
         }
         const sizes = cleanSizes(req.body.sizes, stock)
-        const hand = req.body.listingType === 'sale' || req.body.listingType === 'trade'
         req.body.price = price
         req.body.stock = sizes.reduce((sum, size) => sum + size.stock, 0)
         req.body.sizes = sizes
@@ -116,7 +117,8 @@ exports.newProduct = async (req, res) => {
             req.body.offeredBy = seller._id
             req.body.category = 'Shoes'
             req.body.condition = 'Good'
-            req.body.offerNote = req.body.listingType === 'trade' ? 'Open to a trade.' : ''
+            const note = String(req.body.offerNote || '').trim()
+            req.body.offerNote = isTrade ? (note || 'Open to a trade.') : ''
         } else {
             req.body.listingType = 'shop'
             req.body.seller = req.body.seller || 'J-Trade'
@@ -211,6 +213,18 @@ exports.getSingleProduct = async (req, res, next) => {
     }
     const shown = typeof product.toObject === 'function' ? product.toObject() : { ...product }
     shown.reviews = reviews
+    if ((product.listingType === 'trade' || product.listingType === 'sale') && product.offeredBy != null) {
+        const owner = await User.findById(product.offeredBy).select('name email avatar')
+        if (owner) {
+            shown.offeredBy = {
+                _id: owner._id,
+                name: owner.name,
+                email: owner.email,
+                avatar: owner.avatar
+            }
+            if (!shown.seller) shown.seller = owner.name
+        }
+    }
     return res.status(200).json({
         success: true,
         product: shown,
@@ -261,7 +275,7 @@ exports.updateProduct = async (req, res, next) => {
         }
         if (req.body.price !== undefined) {
             const price = Number(req.body.price)
-            const isTrade = product.listingType === 'trade'
+            const isTrade = (req.body.listingType || product.listingType) === 'trade'
             if (!Number.isFinite(price) || price < 0 || (!isTrade && price <= 0)) {
                 return res.status(400).json({ success: false, message: 'Price has to be a number' })
             }
@@ -278,7 +292,8 @@ exports.updateProduct = async (req, res, next) => {
             req.body.category = 'Shoes'
             req.body.status = 'approved'
             req.body.condition = product.condition || 'Good'
-            req.body.offerNote = req.body.listingType === 'trade' ? (product.offerNote || 'Open to a trade.') : ''
+            const note = String(req.body.offerNote || '').trim()
+            req.body.offerNote = req.body.listingType === 'trade' ? (note || product.offerNote || 'Open to a trade.') : ''
         } else {
             delete req.body.listingType
             delete req.body.status
@@ -359,6 +374,9 @@ exports.createProductReview = async (req, res) => {
         const product = await Product.findById(productId)
         if (!product || product.deletedAt || product.status !== 'approved') {
             return res.status(404).json({ success: false, message: 'Product not found' })
+        }
+        if (product.listingType === 'sale' || product.listingType === 'trade') {
+            return res.status(400).json({ success: false, message: 'Second-hand listings do not take reviews' })
         }
         const bought = await Order.findOne({
             user: req.user._id,

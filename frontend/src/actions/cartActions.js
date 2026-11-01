@@ -55,6 +55,10 @@ export const addItemToCart = (id, quantity, size = '') => async (dispatch, getSt
         throw new Error('This listing is not for sale')
     }
     const sizeRow = (data.product.sizes || []).find(item => item.label === size)
+    const userId = getState().auth.user?._id
+    if (userId && String(loadedForUserId) !== String(userId)) {
+        loadedForUserId = userId
+    }
     dispatch({
         type: ADD_TO_CART,
         payload: {
@@ -64,7 +68,8 @@ export const addItemToCart = (id, quantity, size = '') => async (dispatch, getSt
             image: data.product.images[0].url,
             stock: sizeRow ? sizeRow.stock : data.product.stock,
             size: size || '',
-            quantity
+            quantity,
+            userId
         }
     })
     saveCart(getState)

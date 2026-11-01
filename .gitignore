@@ -24,6 +24,11 @@
 .env.test.local
 .env.production.local
 
+# local scratch / one-off scripts
+/_fr_extract.txt
+/backend/_finalRun.js
+*_finalRun.js
+
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*

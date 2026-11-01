@@ -278,6 +278,26 @@ const ProductDetails = () => {
                             <p>The seller wants a trade, not a paid checkout.</p>
                         </div>
                     )}
+                    {forTrade && (
+                        <div className="owner-card">
+                            <p className="eyebrow">Owner contact</p>
+                            <div className="owner-card-row">
+                                {(product.offeredBy?.avatar?.url || product.offeredBy?.avatar) && (
+                                    <img
+                                        className="owner-card-photo"
+                                        src={product.offeredBy.avatar?.url || product.offeredBy.avatar}
+                                        alt=""
+                                        referrerPolicy="no-referrer"
+                                    />
+                                )}
+                                <div>
+                                    <p className="owner-card-name">{product.offeredBy?.name || product.seller || 'Unknown'}</p>
+                                    {product.offeredBy?.email && <p className="owner-card-mail">{product.offeredBy.email}</p>}
+                                </div>
+                            </div>
+                            <p className="photo-note">Shown here so you can reach them about a trade.</p>
+                        </div>
+                    )}
                     {isAdmin && status !== 'pending' && (
                         <div className="catalog-admin">
                             <button type="button" className="catalog-edit" onClick={() => navigate(`/admin/product/${id}`)}>Edit</button>
