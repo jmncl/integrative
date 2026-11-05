@@ -37,6 +37,7 @@ const UpdateUser = () => {
     const updateUser = async (id, userData) => {
         try {
             const { data } = await axios.put(`${import.meta.env.VITE_API}/admin/user/${id}`, userData, {
+                headers: { 'Content-Type': 'application/json' },
                 withCredentials: true
             })
             setIsUpdated(data.success)
@@ -60,11 +61,15 @@ const UpdateUser = () => {
         if (!user) return
         const ok = await askConfirm('Save this user?', 'This updates the name and role.')
         if (!ok) return
-        const formData = new FormData();
-        formData.set('name', name);
-        formData.set('email', user.email);
-        formData.set('role', role);
-        updateUser(user._id, formData)
+        if (!['user', 'admin'].includes(role)) {
+            errMsg('Pick User or Admin')
+            return
+        }
+        updateUser(user._id, {
+            name: name.trim(),
+            email: user.email,
+            role
+        })
     }
 
     const deactivate = async () => {

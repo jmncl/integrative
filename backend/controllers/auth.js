@@ -283,20 +283,29 @@ exports.getUserDetails = async (req, res, next) => {
 }
 
 exports.updateUser = async (req, res, next) => {
-    const newUserData = {
-        name: req.body.name,
-        email: req.body.email,
-        role: req.body.role
+    const name = String(req.body.name || '').trim()
+    const email = String(req.body.email || '').trim()
+    const role = String(req.body.role || '').trim()
+
+    if (!name) {
+        return res.status(400).json({ success: false, message: 'Name is required' })
+    }
+    if (!['user', 'admin'].includes(role)) {
+        return res.status(400).json({ success: false, message: 'Role must be user or admin' })
     }
 
-    const user = await User.findByIdAndUpdate(req.params.id, newUserData, {
+    const user = await User.findByIdAndUpdate(req.params.id, { name, email, role }, {
         new: true,
         runValidators: true,
-        // useFindAndModify: false
     })
 
+    if (!user) {
+        return res.status(404).json({ success: false, message: 'User not found' })
+    }
+
     return res.status(200).json({
-        success: true
+        success: true,
+        user
     })
 }
 
