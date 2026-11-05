@@ -29,7 +29,9 @@ const OfferQueue = () => {
 
     useEffect(() => {
         if (error) {
-            toast.error(error, { position: 'bottom-right' })
+            if (error !== 'Login first to access this resource') {
+                toast.error(error, { position: 'bottom-right' })
+            }
             dispatch(clearErrors())
         }
     }, [error, dispatch])

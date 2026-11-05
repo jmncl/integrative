@@ -1,8 +1,9 @@
-import axios from 'axios'
+import axios from '../Utils/api'
 import { initializeApp, getApps } from 'firebase/app'
 import { getAuth, GoogleAuthProvider, signInWithPopup } from 'firebase/auth'
 import { CLEAR_CART } from '../constants/cartConstants'
 import { resetCartOwner } from './cartActions'
+import { saveToken, clearToken } from '../Utils/authToken'
 import {
     LOGIN_REQUEST,
     LOGIN_SUCCESS,
@@ -74,7 +75,8 @@ export const login = (email, password) => async (dispatch) => {
             withCredentials: true,
         }
 
-        const { data } = await axios.post(`${import.meta.env.VITE_API}/login`, { email, password }, config)
+        const { data } = await axios.post(`/login`, { email, password }, config)
+        saveToken(data.token)
         resetCartOwner()
         dispatch({ type: CLEAR_CART })
         sessionStorage.removeItem('orderInfo')
@@ -84,6 +86,7 @@ export const login = (email, password) => async (dispatch) => {
             payload: data.user
         })
     } catch (error) {
+        clearToken()
         dispatch({
             type: LOGIN_FAIL,
             payload: error.response?.data?.message || 'Could not log in. Check the email and password.'
@@ -138,14 +141,16 @@ export const loginWithGoogle = () => async (dispatch) => {
         const app = getApps().length ? getApps()[0] : initializeApp(firebaseConfig)
         const result = await googlePopup(getAuth(app), new GoogleAuthProvider())
         const idToken = await result.user.getIdToken()
-        const { data } = await axios.post(`${import.meta.env.VITE_API}/firebase-login`, {
+        const { data } = await axios.post(`/firebase-login`, {
             idToken,
             photoURL: result.user.photoURL || ''
         }, { withCredentials: true })
+        saveToken(data.token)
         resetCartOwner()
         dispatch({ type: CLEAR_CART })
         dispatch({ type: LOGIN_SUCCESS, payload: data.user })
     } catch (error) {
+        clearToken()
         const closed = error?.code === 'auth/popup-closed-by-user' || error?.code === 'auth/cancelled-popup-request'
         dispatch({
             type: LOGIN_FAIL,
@@ -162,7 +167,8 @@ export const logout = () => async (dispatch) => {
             },
             withCredentials: true,
         }
-        await axios.get(`${import.meta.env.VITE_API}/logout`,config)
+        await axios.get(`/logout`, config)
+        clearToken()
         resetCartOwner()
         localStorage.removeItem('cartItems')
         localStorage.removeItem('shippingInfo')
@@ -173,9 +179,10 @@ export const logout = () => async (dispatch) => {
             type: LOGOUT_SUCCESS,
         })
     } catch (error) {
+        clearToken()
         dispatch({
             type: LOGOUT_FAIL,
-            payload: error.response.data.message
+            payload: error.response?.data?.message || 'Logout failed'
         })
     }
 }
@@ -189,12 +196,14 @@ export const loadUser = () => async (dispatch) => {
             withCredentials: true,
         }
         dispatch({ type: LOAD_USER_REQUEST })
-        const { data } = await axios.get(`${import.meta.env.VITE_API}/me`,config)
+        const { data } = await axios.get(`/me`, config)
+        if (data.token) saveToken(data.token)
         dispatch({
             type: LOAD_USER_SUCCESS,
             payload: data.user
         })
     } catch (error) {
+        clearToken()
         dispatch({
             type: LOAD_USER_FAIL,
             payload: error.response?.data?.message || 'Not logged in'
