@@ -72,9 +72,8 @@ const OrdersList = () => {
     useEffect(() => {
         dispatch(allOrders(showDeleted))
         if (error) {
-            errMsg(error)
+            if (error !== 'Login first to access this resource') errMsg(error)
             dispatch(clearErrors())
-
         }
         if (isDeleted) {
             successMsg('Order deleted successfully');
