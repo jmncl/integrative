@@ -42,7 +42,7 @@ const ProcessOrder = () => {
         setSaving(false)
         toast.success('Order Status Updated', { position: 'bottom-right' })
         if (emailSent) toast.success('Email Sent', { position: 'bottom-right' })
-        else toast.error('Email Failed to Send', { position: 'bottom-right' })
+        else toast.error(emailError ? `Email Failed to Send: ${emailError}` : 'Email Failed to Send', { position: 'bottom-right' })
         dispatch({ type: UPDATE_ORDER_RESET })
         dispatch(getOrderDetails(orderId))
     }, [isUpdated, emailSent, emailError, dispatch, orderId])
