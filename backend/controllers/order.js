@@ -174,8 +174,8 @@ exports.updateOrder = async (req, res, next) => {
     let emailSent = false
     let emailError = ''
     const customer = order.user
-    if (!process.env.BREVO_API_KEY && !process.env.RESEND_API_KEY && (!process.env.SMTP_HOST || !process.env.SMTP_EMAIL || !process.env.SMTP_PASSWORD)) {
-        emailError = 'No email provider configured. Add BREVO_API_KEY on Render.'
+    if (!process.env.MAILTRAP_API_TOKEN && (!process.env.MAILTRAP_USER || !process.env.MAILTRAP_PASS)) {
+        emailError = 'Mailtrap is not configured on the server'
     } else if (!customer || !customer.email) {
         emailError = 'Order has no customer email'
     } else {

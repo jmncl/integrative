@@ -1,55 +1,32 @@
 const nodemailer = require('nodemailer');
 
-const sendWithBrevo = async (options) => {
-    const attachmentList = (options.attachments || []).map((file) => ({
-        name: file.filename || 'attachment.pdf',
-        content: Buffer.isBuffer(file.content)
-            ? file.content.toString('base64')
-            : Buffer.from(file.content || '').toString('base64')
-    }))
+const sendWithMailtrapApi = async (options) => {
+    const inboxId = process.env.MAILTRAP_INBOX_ID
+    const url = inboxId
+        ? `https://sandbox.api.mailtrap.io/api/send/${inboxId}`
+        : 'https://send.api.mailtrap.io/api/send'
 
-    const response = await fetch('https://api.brevo.com/v3/smtp/email', {
-        method: 'POST',
-        headers: {
-            accept: 'application/json',
-            'content-type': 'application/json',
-            'api-key': process.env.BREVO_API_KEY
-        },
-        body: JSON.stringify({
-            sender: {
-                name: process.env.SMTP_FROM_NAME || 'J-Trade',
-                email: process.env.SMTP_FROM_EMAIL || process.env.SMTP_EMAIL
-            },
-            to: [{ email: options.email }],
-            subject: options.subject,
-            htmlContent: options.html || `<p>${options.message || ''}</p>`,
-            attachment: attachmentList.length ? attachmentList : undefined
-        })
-    })
-
-    if (!response.ok) {
-        const body = await response.text()
-        throw new Error(body || `Brevo error ${response.status}`)
-    }
-}
-
-const sendWithResend = async (options) => {
     const attachmentList = (options.attachments || []).map((file) => ({
         filename: file.filename || 'attachment.pdf',
         content: Buffer.isBuffer(file.content)
             ? file.content.toString('base64')
-            : Buffer.from(file.content || '').toString('base64')
+            : Buffer.from(file.content || '').toString('base64'),
+        type: file.contentType || 'application/pdf',
+        disposition: 'attachment'
     }))
 
-    const response = await fetch('https://api.resend.com/emails', {
+    const response = await fetch(url, {
         method: 'POST',
         headers: {
-            Authorization: `Bearer ${process.env.RESEND_API_KEY}`,
+            Authorization: `Bearer ${process.env.MAILTRAP_API_TOKEN}`,
             'Content-Type': 'application/json'
         },
         body: JSON.stringify({
-            from: `${process.env.SMTP_FROM_NAME || 'J-Trade'} <${process.env.SMTP_FROM_EMAIL || process.env.SMTP_EMAIL || 'onboarding@resend.dev'}>`,
-            to: [options.email],
+            from: {
+                email: process.env.MAILTRAP_FROM_EMAIL || 'noreply@jtrade.test',
+                name: process.env.SMTP_FROM_NAME || 'J-Trade'
+            },
+            to: [{ email: options.email }],
             subject: options.subject,
             html: options.html || `<p>${options.message || ''}</p>`,
             attachments: attachmentList.length ? attachmentList : undefined
@@ -58,28 +35,28 @@ const sendWithResend = async (options) => {
 
     if (!response.ok) {
         const body = await response.text()
-        throw new Error(body || `Resend error ${response.status}`)
+        throw new Error(body || `Mailtrap API error ${response.status}`)
     }
 }
 
-const sendWithSmtp = async (options) => {
-    const port = Number(process.env.SMTP_PORT) || 587
+const sendWithMailtrapSmtp = async (options) => {
+    // Port 2525 works on Render free; 587/465 are blocked there
+    const port = Number(process.env.MAILTRAP_PORT || 2525)
     const transporter = nodemailer.createTransport({
-        host: process.env.SMTP_HOST,
+        host: process.env.MAILTRAP_HOST || 'sandbox.smtp.mailtrap.io',
         port,
-        secure: port === 465,
-        requireTLS: port === 587,
+        secure: false,
+        auth: {
+            user: process.env.MAILTRAP_USER,
+            pass: process.env.MAILTRAP_PASS
+        },
         connectionTimeout: 10000,
         greetingTimeout: 10000,
-        socketTimeout: 15000,
-        auth: {
-            user: process.env.SMTP_EMAIL,
-            pass: process.env.SMTP_PASSWORD
-        }
+        socketTimeout: 15000
     })
 
     await transporter.sendMail({
-        from: `${process.env.SMTP_FROM_NAME || 'J-Trade'} <${process.env.SMTP_FROM_EMAIL || process.env.SMTP_EMAIL}>`,
+        from: `${process.env.SMTP_FROM_NAME || 'J-Trade'} <${process.env.MAILTRAP_FROM_EMAIL || 'noreply@jtrade.test'}>`,
         to: options.email,
         subject: options.subject,
         html: options.html || `<p>${options.message || ''}</p>`,
@@ -88,21 +65,20 @@ const sendWithSmtp = async (options) => {
 }
 
 const sendEmail = async (options) => {
-    if (process.env.BREVO_API_KEY) {
-        return sendWithBrevo(options)
+    if (process.env.MAILTRAP_API_TOKEN) {
+        return sendWithMailtrapApi(options)
     }
-    if (process.env.RESEND_API_KEY) {
-        return sendWithResend(options)
+
+    if (!process.env.MAILTRAP_USER || !process.env.MAILTRAP_PASS) {
+        throw new Error('Mailtrap is not configured. Add MAILTRAP_USER and MAILTRAP_PASS (or MAILTRAP_API_TOKEN).')
     }
-    if (!process.env.SMTP_HOST || !process.env.SMTP_EMAIL || !process.env.SMTP_PASSWORD) {
-        throw new Error('No email provider configured. Add BREVO_API_KEY on Render (free SMTP is blocked).')
-    }
+
     try {
-        await sendWithSmtp(options)
+        await sendWithMailtrapSmtp(options)
     } catch (error) {
         const msg = String(error.message || error)
-        if (/timeout|timed out|ETIMEDOUT|ECONNREFUSED|ENOTFOUND/i.test(msg)) {
-            throw new Error('SMTP blocked on Render free plan. Add BREVO_API_KEY (HTTPS) or upgrade the web service.')
+        if (/timeout|timed out|ETIMEDOUT|ECONNREFUSED/i.test(msg)) {
+            throw new Error('Mailtrap SMTP timed out. Use MAILTRAP_PORT=2525 or MAILTRAP_API_TOKEN.')
         }
         throw error
     }
