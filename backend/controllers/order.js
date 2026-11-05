@@ -174,8 +174,8 @@ exports.updateOrder = async (req, res, next) => {
     let emailSent = false
     let emailError = ''
     const customer = order.user
-    if (!process.env.SMTP_HOST || !process.env.SMTP_EMAIL || !process.env.SMTP_PASSWORD) {
-        emailError = 'SMTP is not configured on the server'
+    if (!process.env.BREVO_API_KEY && !process.env.RESEND_API_KEY && (!process.env.SMTP_HOST || !process.env.SMTP_EMAIL || !process.env.SMTP_PASSWORD)) {
+        emailError = 'No email provider configured. Add BREVO_API_KEY on Render.'
     } else if (!customer || !customer.email) {
         emailError = 'Order has no customer email'
     } else {
