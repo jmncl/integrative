@@ -46,6 +46,7 @@ const UpdateProduct = () => {
         ['trade', 'For trade']
     ]
     const hand = category === 'sale' || category === 'trade'
+    const forTrade = category === 'trade'
     let { id } = useParams();
     let navigate = useNavigate();
 
@@ -146,6 +147,7 @@ const UpdateProduct = () => {
         }
         if (!Number.isFinite(priceNumber) || priceNumber < 0 || (!isTrade && priceNumber <= 0)) {
             toast.error(isTrade ? 'Price cannot be negative' : 'Price has to be a number, like 1596', { position: 'bottom-right' })
+            return
         }
         if (!cleanedSizes.length || cleanedSizes.some(size => !Number.isFinite(size.stock) || size.stock < 0)) {
             toast.error('Each size needs a name and how many are left', { position: 'bottom-right' })

@@ -138,7 +138,7 @@ const OfferQueue = () => {
         {
             field: 'actions',
             headerName: '',
-            width: showDeleted ? 70 : 210,
+            width: showDeleted ? 70 : 250,
             sortable: false,
             filterable: false,
             renderCell: (params) => (

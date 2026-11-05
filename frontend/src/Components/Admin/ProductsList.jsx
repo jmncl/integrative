@@ -165,11 +165,22 @@ const ProductsList = () => {
         {
             field: 'view',
             headerName: '',
-            width: 70,
+            width: showDeleted ? 70 : 120,
             sortable: false,
             filterable: false,
             renderCell: (params) => (
-                <RowAction showDeleted={showDeleted} to={`/product/${params.id}`} onRestore={() => restoreIds([params.id])} />
+                showDeleted ? (
+                    <RowAction showDeleted to={`/product/${params.id}`} onRestore={() => restoreIds([params.id])} />
+                ) : (
+                    <div className="queue-actions">
+                        <Link to={`/admin/product/${params.id}`} className="table-view" aria-label="Edit">
+                            <i className="fa fa-pencil"></i>
+                        </Link>
+                        <Link to={`/product/${params.id}`} className="table-view" aria-label="View">
+                            <i className="fa fa-eye"></i>
+                        </Link>
+                    </div>
+                )
             )
         }
     ];
