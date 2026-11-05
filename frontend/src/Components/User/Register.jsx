@@ -4,7 +4,8 @@ import { yupResolver } from '@hookform/resolvers/yup'
 import * as yup from 'yup'
 import { Link, useNavigate } from 'react-router-dom'
 import MetaData from '../Layout/MetaData'
-import axios from 'axios'
+import axios from '../../Utils/api'
+import { saveToken } from '../../Utils/authToken'
 import { toast } from 'react-toastify'
 import 'react-toastify/dist/ReactToastify.css'
 
@@ -69,7 +70,8 @@ const Register = () => {
                 withCredentials: true
             }
 
-            await axios.post(`http://localhost:4001/api/v1/register`, userData, config)
+            const { data } = await axios.post(`/register`, userData, config)
+            saveToken(data.token)
             localStorage.removeItem('cartItems')
             localStorage.removeItem('shippingInfo')
             sessionStorage.removeItem('orderInfo')
