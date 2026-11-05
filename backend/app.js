@@ -6,9 +6,12 @@ const products = require('./routes/product');
 const auth = require('./routes/auth');
 const order = require('./routes/order');
 
-// app.use(cors());
+// Local Vite + Render frontend (set FRONTEND_URL on Render)
 app.use(cors({
-    origin: "http://localhost:5173",
+    origin: [
+        "http://localhost:5173",
+        process.env.FRONTEND_URL
+    ].filter(Boolean),
     credentials: true
 }));
 app.use(cookieParser());
