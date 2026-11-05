@@ -80,13 +80,9 @@ const ProcessOrder = () => {
             // setError('')
         }
         if (isUpdated) {
-            if (emailSent) successMsg('Order updated. Receipt email sent.')
-            else if (emailError) {
-                successMsg('Order updated')
-                toast.error(`Email not sent: ${emailError}`)
-            } else {
-                successMsg('Order updated successfully')
-            }
+            successMsg('Order Status Updated')
+            if (emailSent) successMsg('Email Sent')
+            else toast.error(emailError ? `Email Failed to Send: ${emailError}` : 'Email Failed to Send')
             dispatch({ type: UPDATE_ORDER_RESET })
             navigate('/admin/orders')
         }
@@ -103,11 +99,19 @@ const ProcessOrder = () => {
     }
 
     const shippingDetails = shippingInfo && `${shippingInfo.address}, ${shippingInfo.city}, ${shippingInfo.postalCode}, ${shippingInfo.country}`
-    const isPaid = paymentInfo && paymentInfo.status === 'succeeded'
+    const isCash = Boolean(paymentInfo && (
+        paymentInfo.id === 'cash'
+        || paymentInfo.method === 'Cash on delivery'
+        || String(paymentInfo.status || '').toLowerCase().includes('cash')
+    ))
+    const isPaid = Boolean(
+        (paymentInfo && paymentInfo.status === 'succeeded')
+        || (isCash && String(orderStatus || '').includes('Delivered'))
+    )
     const paymentType = !paymentInfo
         ? 'Not set'
         : paymentInfo.method
-            || (paymentInfo.id === 'cash' || String(paymentInfo.status || '').toLowerCase().includes('cash') ? 'Cash on delivery' : (paymentInfo.status === 'succeeded' ? 'Card' : 'Not set'))
+            || (isCash ? 'Cash on delivery' : (paymentInfo.status === 'succeeded' ? 'Card' : 'Not set'))
     return (
         <>
             <MetaData title={`Process ${order?.code || (order?._id ? `JO${order._id}` : 'Order')}`} />

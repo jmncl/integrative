@@ -153,6 +153,19 @@ exports.updateOrder = async (req, res, next) => {
     }
     if (status === 'Delivered') {
         order.deliveredAt = Date.now()
+        const pay = order.paymentInfo || {}
+        const isCash = pay.id === 'cash'
+            || pay.method === 'Cash on delivery'
+            || String(pay.status || '').toLowerCase().includes('cash')
+        if (isCash) {
+            order.paymentInfo = {
+                id: pay.id || 'cash',
+                status: 'succeeded',
+                method: pay.method || 'Cash on delivery'
+            }
+            order.markModified('paymentInfo')
+            if (!order.paidAt) order.paidAt = Date.now()
+        }
     }
 
     order.orderStatus = status

@@ -56,7 +56,15 @@ const OrderDetails = () => {
 
     const shippingDetails = shippingInfo && `${shippingInfo.address}, ${shippingInfo.city}, ${shippingInfo.postalCode}, ${shippingInfo.country}`
 
-    const isPaid = paymentInfo && paymentInfo.status === 'succeeded' ? true : false
+    const isCash = Boolean(paymentInfo && (
+        paymentInfo.id === 'cash'
+        || paymentInfo.method === 'Cash on delivery'
+        || String(paymentInfo.status || '').toLowerCase().includes('cash')
+    ))
+    const isPaid = Boolean(
+        (paymentInfo && paymentInfo.status === 'succeeded')
+        || (isCash && String(orderStatus || '').includes('Delivered'))
+    )
 
     return (
         <>
