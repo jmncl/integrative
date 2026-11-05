@@ -177,8 +177,11 @@ const NewOffer = () => {
                     )}
 
                     <div className="form-group">
-                        <label htmlFor="offer_seller">Your name</label>
+                        <label htmlFor="offer_seller">{listingType === 'sale' ? 'Your name (previous owner)' : 'Your name'}</label>
                         <input type="text" id="offer_seller" className="form-control" value={seller} onChange={(e) => setSeller(e.target.value)} />
+                        {listingType === 'sale' && (
+                            <p className="photo-note">For sale items are sold by J-Trade. Your name shows as the previous owner.</p>
+                        )}
                     </div>
 
                     <div className="form-group">

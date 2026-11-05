@@ -72,7 +72,7 @@ const NewProduct = () => {
         const selling = values.category === 'sale' || values.category === 'trade'
         const person = people.find(item => item.name.toLowerCase() === sellerName.trim().toLowerCase())
         if (selling && !person) {
-            toast.error('Choose a seller from the list', { position: 'bottom-right' })
+            toast.error(values.category === 'sale' ? 'Choose a previous owner from the list' : 'Choose a seller from the list', { position: 'bottom-right' })
             return
         }
         dispatch(newProduct({
@@ -251,7 +251,7 @@ const NewProduct = () => {
 
                                 {hand && (
                                     <div className="form-group">
-                                        <label htmlFor="seller_field">Who is selling</label>
+                                        <label htmlFor="seller_field">{forTrade ? 'Who is trading' : 'Previous Owner'}</label>
                                         <input
                                             type="text"
                                             id="seller_field"

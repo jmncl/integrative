@@ -267,7 +267,13 @@ const ProductDetails = () => {
                         <p id="product_price">{peso(product.price)}</p>
                     )}
                     {forSale && <p className="card-category">For sale</p>}
-                    {secondHand && <p className="owner-line">Owner <strong>{product.seller || 'Unknown'}</strong></p>}
+                    {forSale && (
+                        <>
+                            <p className="owner-line">Sold by <strong>J-Trade</strong></p>
+                            <p className="owner-line">Previous Owner <strong>{product.seller || 'Unknown'}</strong></p>
+                        </>
+                    )}
+                    {forTrade && <p className="owner-line">Owner <strong>{product.seller || 'Unknown'}</strong></p>}
                     {product.category && <p className="card-category">{product.category}</p>}
                     {product.condition && <p className="photo-note">Condition: {product.condition}</p>}
                     {forTrade && status === 'approved' && (
@@ -275,7 +281,7 @@ const ProductDetails = () => {
                             <p className="eyebrow">For trade</p>
                             <p>{product.offerNote}</p>
                             {sizes.length > 0 && <p>Size {sizes.map(item => item.label).join(', ')}</p>}
-                            <p>The seller wants a trade, not a paid checkout.</p>
+                            <p>The owner wants a trade, not a paid checkout.</p>
                         </div>
                     )}
                     {forTrade && (
