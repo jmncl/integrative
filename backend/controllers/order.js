@@ -159,8 +159,13 @@ exports.updateOrder = async (req, res, next) => {
     await order.save()
 
     let emailSent = false
+    let emailError = ''
     const customer = order.user
-    if (customer && customer.email && process.env.SMTP_HOST) {
+    if (!process.env.SMTP_HOST || !process.env.SMTP_EMAIL || !process.env.SMTP_PASSWORD) {
+        emailError = 'SMTP is not configured on the server'
+    } else if (!customer || !customer.email) {
+        emailError = 'Order has no customer email'
+    } else {
         try {
             const pdf = await buildReceipt(order)
             await sendEmail({
@@ -175,13 +180,15 @@ exports.updateOrder = async (req, res, next) => {
             })
             emailSent = true
         } catch (error) {
-            console.log(error.message)
+            emailError = error.message || 'Email failed'
+            console.log('Order email failed:', emailError)
         }
     }
 
     res.status(200).json({
         success: true,
-        emailSent
+        emailSent,
+        emailError: emailSent ? '' : emailError
     })
 }
 

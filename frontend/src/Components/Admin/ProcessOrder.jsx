@@ -17,7 +17,7 @@ const ProcessOrder = () => {
     const dispatch = useDispatch();
     const { loading, order = {} } = useSelector(state => state.orderDetails)
 
-    const { error, isUpdated } = useSelector(state => state.order)
+    const { error, isUpdated, emailSent, emailError } = useSelector(state => state.order)
     const { shippingInfo, orderItems, paymentInfo, user, totalPrice, orderStatus } = order
 
     const [status, setStatus] = useState('')
@@ -80,20 +80,26 @@ const ProcessOrder = () => {
             // setError('')
         }
         if (isUpdated) {
-            successMsg('Order updated successfully');
+            if (emailSent) successMsg('Order updated. Receipt email sent.')
+            else if (emailError) {
+                successMsg('Order updated')
+                toast.error(`Email not sent: ${emailError}`)
+            } else {
+                successMsg('Order updated successfully')
+            }
             dispatch({ type: UPDATE_ORDER_RESET })
-
-            // setIsUpdated('')
             navigate('/admin/orders')
         }
-    }, [error, isUpdated, orderId])
+    }, [error, isUpdated, emailSent, emailError, orderId])
 
     const updateOrderHandler = async (id) => {
         const ok = await askConfirm('Update this order?', 'This saves the new status.')
         if (!ok) return
-        const formData = new FormData();
-        formData.set('status', status);
-        dispatch(updateOrder(id, formData))
+        if (!status) {
+            toast.error('Choose an order status')
+            return
+        }
+        dispatch(updateOrder(id, { status }))
     }
 
     const shippingDetails = shippingInfo && `${shippingInfo.address}, ${shippingInfo.city}, ${shippingInfo.postalCode}, ${shippingInfo.country}`

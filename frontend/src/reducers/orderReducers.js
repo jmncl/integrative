@@ -153,7 +153,9 @@ export const orderReducer = (state = {}, action) => {
             return {
                 ...state,
                 loading: false,
-                isUpdated: action.payload
+                isUpdated: Boolean(action.payload?.success ?? action.payload),
+                emailSent: Boolean(action.payload?.emailSent),
+                emailError: action.payload?.emailError || ''
             }
         case DELETE_ORDER_SUCCESS:
             return {
@@ -170,7 +172,9 @@ export const orderReducer = (state = {}, action) => {
         case UPDATE_ORDER_RESET:
             return {
                 ...state,
-                isUpdated: false
+                isUpdated: false,
+                emailSent: false,
+                emailError: ''
             }
         case DELETE_ORDER_RESET:
             return {
