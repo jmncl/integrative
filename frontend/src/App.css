@@ -357,10 +357,11 @@
 
 .card-img-top {
   width: 100%;
-  height: 210px;
-  object-fit: contain;
+  height: 260px;
+  object-fit: cover;
+  object-position: center top;
   background: #fbfaf8;
-  padding: 16px;
+  padding: 0;
 }
 
 .card-body {
