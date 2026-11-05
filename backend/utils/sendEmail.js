@@ -7,6 +7,9 @@ const sendEmail = async options => {
         port,
         secure: port === 465,
         requireTLS: port === 587,
+        connectionTimeout: 10000,
+        greetingTimeout: 10000,
+        socketTimeout: 15000,
         auth: {
             user: process.env.SMTP_EMAIL,
             pass: process.env.SMTP_PASSWORD

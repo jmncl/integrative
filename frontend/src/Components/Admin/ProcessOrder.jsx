@@ -31,6 +31,7 @@ const ProcessOrder = () => {
 
     useEffect(() => {
         if (error) {
+            setSaving(false)
             toast.error(error, { position: 'bottom-right' })
             dispatch(clearErrors())
         }
@@ -38,10 +39,10 @@ const ProcessOrder = () => {
 
     useEffect(() => {
         if (!isUpdated) return
+        setSaving(false)
         toast.success('Order Status Updated', { position: 'bottom-right' })
         if (emailSent) toast.success('Email Sent', { position: 'bottom-right' })
         else toast.error('Email Failed to Send', { position: 'bottom-right' })
-        setSaving(false)
         dispatch({ type: UPDATE_ORDER_RESET })
         dispatch(getOrderDetails(orderId))
     }, [isUpdated, emailSent, emailError, dispatch, orderId])
@@ -63,6 +64,12 @@ const ProcessOrder = () => {
         if (!ok) return
         setSaving(true)
         dispatch(updateOrder(id, { status }))
+        window.setTimeout(() => {
+            setSaving(current => {
+                if (current) toast.error('Update is taking too long. Check your connection and try again.', { position: 'bottom-right' })
+                return false
+            })
+        }, 45000)
     }
 
     const shippingDetails = shippingInfo && `${shippingInfo.address}, ${shippingInfo.city}, ${shippingInfo.postalCode}, ${shippingInfo.country}`

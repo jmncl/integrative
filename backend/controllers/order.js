@@ -181,7 +181,7 @@ exports.updateOrder = async (req, res, next) => {
     } else {
         try {
             const pdf = await buildReceipt(order)
-            await sendEmail({
+            const sendPromise = sendEmail({
                 email: customer.email,
                 subject: `J-Trade order ${order.code || `JO${order._id}`} is ${order.orderStatus}`,
                 html: receiptHtml(order),
@@ -191,6 +191,10 @@ exports.updateOrder = async (req, res, next) => {
                     contentType: 'application/pdf'
                 }]
             })
+            const timeoutPromise = new Promise((_, reject) => {
+                setTimeout(() => reject(new Error('Email timed out')), 20000)
+            })
+            await Promise.race([sendPromise, timeoutPromise])
             emailSent = true
         } catch (error) {
             emailError = error.message || 'Email failed'
